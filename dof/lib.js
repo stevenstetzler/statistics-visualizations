@@ -138,7 +138,7 @@ const NS = 'http://www.w3.org/2000/svg';
 function svgEl(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
 
 /* ----------------------------------------------------- 2-D scatter (x, y) */
-export function createScatter(svg, state, { draggable = true, showCand = false, showFit = true } = {}) {
+export function createScatter(svg, state, { draggable = true, showCand = false, showFit = true, bands = false } = {}) {
   const col = colors();
   const SW = 320, SH = 230, M = { l: 30, r: 10, t: 10, b: 24 };
   svg.setAttribute('viewBox', `0 0 ${SW} ${SH}`);
@@ -150,6 +150,17 @@ export function createScatter(svg, state, { draggable = true, showCand = false, 
   for (let v = -3; v <= 3; v++) { svgEl('line', { x1: sx(v), x2: sx(v), y1: M.t, y2: SH - M.b, stroke: col.muted, 'stroke-opacity': v === 0 ? 0.6 : 0.2 }, svg); svgEl('text', { x: sx(v), y: SH - 8, 'text-anchor': 'middle', fill: col.muted, 'font-size': 10 }, svg).textContent = v; }
   svgEl('text', { x: SW - M.r, y: SH - 8, 'text-anchor': 'end', fill: col.muted, 'font-size': 11, 'font-style': 'italic' }, svg).textContent = 'x';
   svgEl('text', { x: M.l + 4, y: M.t + 10, fill: col.muted, 'font-size': 11, 'font-style': 'italic' }, svg).textContent = 'y';
+  // uncertainty bands (drawn first so lines and points sit on top)
+  const clipId = 'clip-' + Math.random().toString(36).slice(2);
+  svgEl('rect', { x: M.l, y: M.t, width: SW - M.l - M.r, height: SH - M.t - M.b }, svgEl('clipPath', { id: clipId }, svgEl('defs', {}, svg)));
+  const gB = svgEl('g', { 'clip-path': `url(#${clipId})` }, svg);
+  const bFit = svgEl('path', { fill: col.fit, 'fill-opacity': 0.16, stroke: 'none' }, gB);
+  const bCand = svgEl('path', { fill: col.cand, 'fill-opacity': 0.1, stroke: col.cand, 'stroke-opacity': 0.4, 'stroke-width': 1, 'stroke-dasharray': '3 3' }, gB);
+  const band = (fn) => { // closed polygon m ± w over the plotted x-range
+    const up = [], lo = [];
+    for (let v = XR[0]; v <= XR[1] + 1e-9; v += 0.1) { const [m, w] = fn(v); up.push(`${sx(v).toFixed(1)} ${sy(m + w).toFixed(1)}`); lo.push(`${sx(v).toFixed(1)} ${sy(m - w).toFixed(1)}`); }
+    return 'M' + up.join('L') + 'L' + lo.reverse().join('L') + 'Z';
+  };
   const lCand = svgEl('line', { stroke: col.cand, 'stroke-width': 2 }, svg);
   const lFit = svgEl('line', { stroke: col.fit, 'stroke-width': 2.5 }, svg);
   lCand.style.display = showCand ? '' : 'none'; lFit.style.display = showFit ? '' : 'none';
@@ -171,6 +182,13 @@ export function createScatter(svg, state, { draggable = true, showCand = false, 
   return () => {
     const { x, y } = state, f = solve(x, y), c = rawLine(state);
     setLine(lCand, c.a, c.b); setLine(lFit, f.a, f.b);
+    if (bands) {
+      // best-fit line: every line whose (a, b) lies inside the joint 95% ellipse stays within  ŷ(x) ± √5.99·σ·√h(x),
+      // with h(x) = [1 x](XᵀX)⁻¹[1 x]ᵀ.  Your line: ±σ of noise around it.
+      const K = Math.sqrt(5.991), sg = state.sigma, Sx = x[0] + x[1] + x[2], Sxx = dot(x, x), det = 3 * Sxx - Sx * Sx;
+      bFit.setAttribute('d', showFit && det > 1e-3 ? band((v) => [f.a + f.b * v, K * sg * Math.sqrt(Math.max((Sxx - 2 * Sx * v + 3 * v * v) / det, 0))]) : '');
+      bCand.setAttribute('d', showCand ? band((v) => [c.a + c.b * v, sg]) : '');
+    }
     for (let i = 0; i < 3; i++) {
       const px = sx(x[i]);
       res[i].setAttribute('x1', px); res[i].setAttribute('x2', px);

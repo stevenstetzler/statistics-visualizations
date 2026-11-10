@@ -49,4 +49,4 @@ table.cmp th{color:var(--muted);font-size:12px;letter-spacing:.04em;text-transfo
 .tut .callout .katex-display{margin:.7em 0}
 .tut table.cmp .katex{font-size:1.05em}
 .tut h1 .katex,.tut h2 .katex,.tut h3 .katex{font-size:1em}
-.m-data{color:var(--data)}.m-fit{color:var(--fit)}.m-cand{color:var(--cand)}.m-resid{color:var(--resid)}.m-u{color:var(--res-u)}
+.m-data{color:var(--data)}.m-fit{color:var(--fit)}.m-cand{color:var(--cand)}.m-resid{color:var(--resid)}.m-u{color:var(--res-u)}.tut p.small{font-size:12.5px}

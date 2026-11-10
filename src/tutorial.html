@@ -185,7 +185,7 @@ $$\underbrace{\lVert \mathbf y - \mathbf c \rVert^2}_{\sigma^2\chi^2_3}
 <div class="cols">
   <div class="stack">
     <div class="card"><h3>Data and your model</h3><svg id="scatter2" role="img" aria-label="Scatter plot with the best-fit line and your chosen line"></svg>
-      <p class="small"><span class="sw" style="background:var(--fit)"></span>best-fit line, <span class="sw" style="background:var(--cand)"></span>your (a, b) line.</p></div>
+      <p class="small"><span class="sw" style="background:var(--fit)"></span>best-fit line, <span class="sw" style="background:var(--cand)"></span>your \((a, b)\) line. <b>Blue band:</b> every line whose \((a, b)\) lies inside the 95% parameter ellipse for the current \(\sigma\). <b>Violet band:</b> \(\pm\sigma\) of noise around your line.</p></div>
   </div>
   <div class="stack">
     <div class="card slrow3"><div id="slY3"></div><div id="slAB3"></div><div id="slSigma3"></div></div>
@@ -199,6 +199,19 @@ $$\underbrace{\lVert \mathbf y - \mathbf c \rVert^2}_{\sigma^2\chi^2_3}
   <div class="card"><h3>Your \((a, b)\) vs the best line · \(\chi^2_2\)</h3><svg id="chi2" role="img" aria-label="Chi-square with 2 degrees of freedom and the in-plane distance marked"></svg><div id="v2" class="small"></div></div>
 </div>
 <div id="verdict" class="callout"></div>
+<div class="callout">
+  <p><b>Why a steep line can still pass at large \(\sigma\).</b> Every distance in these tests is measured in units of \(\sigma\). Raise \(\sigma\) and the same gap between the data and a line becomes a smaller number of noise-units, so more lines look plausible. In the picture, two things grow together:</p>
+  <ul>
+    <li>The <b>blue band</b> widens: the uncertainty in \((a, b)\), which scales as \(\sigma^2 (X^\top X)^{-1}\), now allows a larger family of lines. A line passes the \(\chi^2_2\) test exactly when its \((a, b)\) lies inside the 95% ellipse from Part 2, which is the same as the line staying inside the band over all \(x\):
+      $$\frac{\lVert\hat{\mathbf y} - \mathbf c\rVert^2}{\sigma^2} \le 5.99
+      \iff
+      \bigl|c(x) - \hat y(x)\bigr| \le \sqrt{5.99}\,\sigma\sqrt{h(x)}\ \ \text{for all } x,
+      \qquad
+      h(x) = \begin{bmatrix}1 & x\end{bmatrix}(X^\top X)^{-1}\begin{bmatrix}1 \\ x\end{bmatrix}.$$</li>
+    <li>The <b>violet band</b> widens: the \(\pm\sigma\) noise around your line now covers the data points, so the \(\chi^2_3\) error, \(\lVert\mathbf y - \mathbf c\rVert^2/\sigma^2\), is small.</li>
+  </ul>
+  <p>The steep line passes because, at this \(\sigma\), the data cannot rule it out. That is a statement about how little three noisy points can tell you, not evidence that the line is right. Shrink \(\sigma\) and the bands tighten, and the same line fails.</p>
+</div>
 <h2>What does “X% of noise draws are this large” mean?</h2>
 <p>Under each plot you will see a sentence like <em>“If the model were true, 1.4% of repeated experiments would give a value at least this large.”</em> It describes a thought experiment, and it is worth spelling out:</p>
 <ol>

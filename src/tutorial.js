@@ -25,7 +25,7 @@ const model3d = createModelView($('view3d'), state, { cloud: false });
 const noise3d = createModelView($('view3dNoise'), state, { cloud: true, minimal: true, camera: [11, 6, 9] });
 const param = createParamView($('paramSvg'), state);
 const hist = createHistView($('histSvg'), state);
-const scatter2 = createScatter($('scatter2'), state, { draggable: true, showCand: true, showFit: true });
+const scatter2 = createScatter($('scatter2'), state, { draggable: true, showCand: true, showFit: true, bands: true });
 const chi1 = createChiPlot($('chi1'), 1, col.fit), chi2 = createChiPlot($('chi2'), 2, col.ink), chi3 = createChiPlot($('chi3'), 3, col.cand);
 let stat = 'res';
 

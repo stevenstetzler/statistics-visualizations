@@ -21,7 +21,7 @@ const refreshAB = buildSliders(sliderHost, abSliders(), state);
 const refreshSigma = buildSliders($('noiseSliders'), [sigmaSlider()], state);
 
 /* --------------------------------------------------------------- views */
-const scatter = createScatter($('scatter'), state, { draggable: true, showCand: true, showFit: true });
+const scatter = createScatter($('scatter'), state, { draggable: true, showCand: true, showFit: true, bands: true });
 const model = createModelView($('view'), state, { cloud: true, fits: false, epsilon: true });
 
 /* ------------------------------------------------------------- buttons */
