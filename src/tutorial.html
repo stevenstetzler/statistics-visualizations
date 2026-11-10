@@ -199,6 +199,25 @@ $$\underbrace{\lVert \mathbf y - \mathbf c \rVert^2}_{\sigma^2\chi^2_3}
   <div class="card"><h3>Your \((a, b)\) vs the best line · \(\chi^2_2\)</h3><svg id="chi2" role="img" aria-label="Chi-square with 2 degrees of freedom and the in-plane distance marked"></svg><div id="v2" class="small"></div></div>
 </div>
 <div id="verdict" class="callout"></div>
+<h2>What does “X% of noise draws are this large” mean?</h2>
+<p>Under each plot you will see a sentence like <em>“If the model were true, 1.4% of repeated experiments would give a value at least this large.”</em> It describes a thought experiment, and it is worth spelling out:</p>
+<ol>
+  <li><b>Assume the model is exactly right:</b> the truth is the line \(\mathbf c\) and the noise is Gaussian with the \(\sigma\) on the slider.</li>
+  <li><b>Repeat the experiment</b> over and over. Each repeat gives a new dataset \(\mathbf y = \mathbf c + \boldsymbol\varepsilon\) and so a new value of the statistic (\(\mathrm{RSS}/\sigma^2\), and so on).</li>
+  <li><b>Ask what fraction of those repeats give a value at least as large</b> as the one you actually measured. That fraction is the shaded area under the curve, the <b>tail probability</b> or p-value. The text under each plot also counts it directly in 4000 simulated repeats, so you can check the curve against the simulation.</li>
+</ol>
+<p>So “1.4% of noise draws are this large” means: if nothing but noise of this size were going on, you would see a mismatch this big about once in 70 experiments.</p>
+<div class="callout">
+  <p><b>What are you aiming for?</b> Not for the biggest p, and not for the smallest error. You are aiming to <b>not be surprised</b>: the marker should sit where noise of this size ordinarily puts it, in the body of the curve and not out in either tail.</p>
+  <ul>
+    <li><b>Why not maximize p?</b> If the model really is right, p is spread evenly between 0 and 1, so 0.9 is just as likely as 0.1. A value of 0.99 is not extra good; it is as unusual as 0.01, and says the data are suspiciously close to the model (or that \(\sigma\) was set too large).</li>
+    <li><b>The cutoff is a convention.</b> We call p below about 0.05 a right tail. But a perfectly correct model lands there about 1 time in 20, so one borderline value is weak evidence. Treat the tails as "worth a second look", not as a verdict.</li>
+    <li><b>"Good choice" means "no evidence against it."</b> A typical value says the data are consistent with the model plus noise. It does not prove the model is right, and other models may be just as consistent.</li>
+    <li><b>Use the right reference curve.</b> The \(\chi^2_3\) panel is only valid for an \((a, b)\) fixed <em>before</em> looking at \(\mathbf y\). If you chose \((a, b)\) by tuning it to these data, including "set to least squares", you have fitted two parameters, and the honest reference is \(\chi^2_1\), the best-fit panel. Comparing a tuned model to \(\chi^2_3\) is too lenient.</li>
+    <li><b>The \(\chi^2_2\) panel asks a different question</b>: can the data tell your \((a, b)\) apart from the best line? A small tail means yes, your choice is detectably worse. A large p means the data cannot distinguish them, which is the same as your \((a, b)\) lying inside the ellipse from Part 2.</li>
+  </ul>
+</div>
+
 <h2>How to read it</h2>
 <ul>
   <li><b>Right tail (small p).</b> The data are farther from the model than noise of this size usually puts them. Either the model is the wrong shape (here, the points bend and a line cannot follow), or the noise is larger than the \(\sigma\) you assumed.</li>

@@ -311,6 +311,23 @@ export function createHistView(svg, state) {
   };
 }
 
+/* ------------------------------------------------ math typesetting (KaTeX) */
+export const TEX = {
+  delimiters: [{ left: '$$', right: '$$', display: true }, { left: '\\(', right: '\\)', display: false }],
+  throwOnError: false,
+  trust: (c) => c.command === '\\htmlClass',
+  macros: {
+    '\\ycol': '\\htmlClass{m-data}{\\mathbf{y}}',
+    '\\yhcol': '\\htmlClass{m-fit}{\\hat{\\mathbf{y}}}',
+    '\\ccol': '\\htmlClass{m-cand}{\\mathbf{c}}',
+    '\\rcol': '\\htmlClass{m-resid}{\\mathbf{r}}',
+    '\\ucol': '\\htmlClass{m-u}{\\mathbf{u}}',
+  },
+};
+export const typeset = (el) => { if (window.renderMathInElement) window.renderMathInElement(el, TEX); };
+/** set innerHTML, then typeset any math in it */
+export const setHTML = (el, html) => { el.innerHTML = html; typeset(el); };
+
 /* ------------------------------------- χ² tail probabilities and a marker plot */
 function erfc(x) { // Numerical Recipes erfcc, relative error < 1.2e-7 (x >= 0)
   const t = 1 / (1 + 0.5 * x);
@@ -322,6 +339,12 @@ export function chiSf(k, z) {
   if (k === 1) return erfc(Math.sqrt(z / 2));
   if (k === 2) return Math.exp(-z / 2);
   return erfc(Math.sqrt(z / 2)) + Math.sqrt(2 * z / Math.PI) * Math.exp(-z / 2);
+}
+/** fraction of 4000 simulated repeats (sums of k squared standard normals) at least as large as z */
+export function simTail(k, z) {
+  let count = 0;
+  for (const e of EPS_H) { let t = 0; for (let j = 0; j < k; j++) t += e[j] * e[j]; if (t >= z) count++; }
+  return { count, n: EPS_H.length };
 }
 /** χ²_k density with a marker at z and the upper tail shaded */
 export function createChiPlot(svg, k, color) {

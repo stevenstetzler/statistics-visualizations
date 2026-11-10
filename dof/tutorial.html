@@ -57,6 +57,13 @@ button:hover{border-color:var(--fit)}
   #legend{display:none}
 }
 
+/* math (KaTeX) */
+.katex{font-size:1.05em}
+.katex svg{background:none;border:0;border-radius:0;height:inherit;display:block;touch-action:auto}
+.m-data{color:var(--data)}.m-fit{color:var(--fit)}.m-cand{color:var(--cand)}.m-resid{color:var(--resid)}.m-u{color:var(--res-u)}
+.kv .v .katex{font-size:1em}
+.card h3 .katex,h2 .katex{text-transform:none}
+
 /* tutorial page */
 body.tut{height:auto}
 .tut main{max-width:1120px;margin:0 auto;padding:28px 20px 80px}
@@ -109,9 +116,6 @@ table.cmp th{color:var(--muted);font-size:12px;letter-spacing:.04em;text-transfo
 .tut table.cmp .katex{font-size:1.05em}
 .tut h1 .katex,.tut h2 .katex,.tut h3 .katex{font-size:1em}
 .m-data{color:var(--data)}.m-fit{color:var(--fit)}.m-cand{color:var(--cand)}.m-resid{color:var(--resid)}.m-u{color:var(--res-u)}
-/* keep KaTeX's own svg (radicals, braces, big delimiters) clear of the plot svg styling */
-.tut .katex svg{background:none;border:0;border-radius:0;height:inherit;display:block;touch-action:auto}
-
 </style>
 <link rel="stylesheet" href="vendor/katex/katex.min.css">
 <script defer src="vendor/katex/katex.min.js"></script>
@@ -305,6 +309,25 @@ $$\underbrace{\lVert \mathbf y - \mathbf c \rVert^2}_{\sigma^2\chi^2_3}
   <div class="card"><h3>Your \((a, b)\) vs the best line · \(\chi^2_2\)</h3><svg id="chi2" role="img" aria-label="Chi-square with 2 degrees of freedom and the in-plane distance marked"></svg><div id="v2" class="small"></div></div>
 </div>
 <div id="verdict" class="callout"></div>
+<h2>What does “X% of noise draws are this large” mean?</h2>
+<p>Under each plot you will see a sentence like <em>“If the model were true, 1.4% of repeated experiments would give a value at least this large.”</em> It describes a thought experiment, and it is worth spelling out:</p>
+<ol>
+  <li><b>Assume the model is exactly right:</b> the truth is the line \(\mathbf c\) and the noise is Gaussian with the \(\sigma\) on the slider.</li>
+  <li><b>Repeat the experiment</b> over and over. Each repeat gives a new dataset \(\mathbf y = \mathbf c + \boldsymbol\varepsilon\) and so a new value of the statistic (\(\mathrm{RSS}/\sigma^2\), and so on).</li>
+  <li><b>Ask what fraction of those repeats give a value at least as large</b> as the one you actually measured. That fraction is the shaded area under the curve, the <b>tail probability</b> or p-value. The text under each plot also counts it directly in 4000 simulated repeats, so you can check the curve against the simulation.</li>
+</ol>
+<p>So “1.4% of noise draws are this large” means: if nothing but noise of this size were going on, you would see a mismatch this big about once in 70 experiments.</p>
+<div class="callout">
+  <p><b>What are you aiming for?</b> Not for the biggest p, and not for the smallest error. You are aiming to <b>not be surprised</b>: the marker should sit where noise of this size ordinarily puts it, in the body of the curve and not out in either tail.</p>
+  <ul>
+    <li><b>Why not maximize p?</b> If the model really is right, p is spread evenly between 0 and 1, so 0.9 is just as likely as 0.1. A value of 0.99 is not extra good; it is as unusual as 0.01, and says the data are suspiciously close to the model (or that \(\sigma\) was set too large).</li>
+    <li><b>The cutoff is a convention.</b> We call p below about 0.05 a right tail. But a perfectly correct model lands there about 1 time in 20, so one borderline value is weak evidence. Treat the tails as "worth a second look", not as a verdict.</li>
+    <li><b>"Good choice" means "no evidence against it."</b> A typical value says the data are consistent with the model plus noise. It does not prove the model is right, and other models may be just as consistent.</li>
+    <li><b>Use the right reference curve.</b> The \(\chi^2_3\) panel is only valid for an \((a, b)\) fixed <em>before</em> looking at \(\mathbf y\). If you chose \((a, b)\) by tuning it to these data, including "set to least squares", you have fitted two parameters, and the honest reference is \(\chi^2_1\), the best-fit panel. Comparing a tuned model to \(\chi^2_3\) is too lenient.</li>
+    <li><b>The \(\chi^2_2\) panel asks a different question</b>: can the data tell your \((a, b)\) apart from the best line? A small tail means yes, your choice is detectably worse. A large p means the data cannot distinguish them, which is the same as your \((a, b)\) lying inside the ellipse from Part 2.</li>
+  </ul>
+</div>
+
 <h2>How to read it</h2>
 <ul>
   <li><b>Right tail (small p).</b> The data are farther from the model than noise of this size usually puts them. Either the model is the wrong shape (here, the points bend and a line cannot follow), or the noise is larger than the \(\sigma\) you assumed.</li>
@@ -319,25 +342,8 @@ $$\underbrace{\lVert \mathbf y - \mathbf c \rVert^2}_{\sigma^2\chi^2_3}
 </div>
 </main>
 <script type="module">
-import { createState, createScatter, createParamView, createModelView, createHistView, histStats, createChiPlot, chiSf, buildSliders, xSliders, ySliders, abSliders, sigmaSlider,
+import { createState, createScatter, createParamView, createModelView, createHistView, histStats, createChiPlot, chiSf, simTail, typeset, setHTML, buildSliders, xSliders, ySliders, abSliders, sigmaSlider,
   solve, fitParams, bootstrapSamples, MODES, setCenter, modelC, xbasis, xbar, covHTML, dot, sub, ONES, fmt, vfmt, clamp, gauss, add, scale, norm, colors } from './lib.js';
-
-/* math typesetting (KaTeX auto-render, vendored in vendor/katex) */
-const TEX = {
-  delimiters: [{ left: '$$', right: '$$', display: true }, { left: '\\(', right: '\\)', display: false }],
-  throwOnError: false,
-  trust: (c) => c.command === '\\htmlClass',
-  macros: {
-    '\\ycol': '\\htmlClass{m-data}{\\mathbf{y}}',
-    '\\yhcol': '\\htmlClass{m-fit}{\\hat{\\mathbf{y}}}',
-    '\\ccol': '\\htmlClass{m-cand}{\\mathbf{c}}',
-    '\\rcol': '\\htmlClass{m-resid}{\\mathbf{r}}',
-    '\\ucol': '\\htmlClass{m-u}{\\mathbf{u}}',
-  },
-};
-const typeset = (el) => { if (window.renderMathInElement) window.renderMathInElement(el, TEX); };
-/** set innerHTML and typeset any math in it */
-const setHTML = (el, html) => { el.innerHTML = html; typeset(el); };
 
 const DEFAULT = { x: [0, 1, 2], y: [1, 2.6, 3], a: 0.5, b: 1.2, sigma: 1, center: false, cloudCenter: 'c' };
 const state = createState(DEFAULT);
@@ -447,14 +453,18 @@ function histNote(st) {
   return String.raw`<p>${what}${extra} If you use the wrong \(\sigma\) the whole histogram scales, whatever df you use.</p>`;
 }
 
-/** one-line reading of a tail probability */
-function reading(k, z, what) {
-  const upper = chiSf(k, z), lower = 1 - upper;
-  if (upper < 0.01) return `<b style="color:var(--resid)">Far in the right tail</b>: noise this size would exceed ${what} only ${fmt(upper * 100, 1)}% of the time.`;
-  if (upper < 0.05) return `<b style="color:var(--resid)">Right tail</b>: only ${fmt(upper * 100, 1)}% of noise draws are this large.`;
-  if (lower < 0.05) return `<b>Left tail</b>: closer than ${fmt((1 - lower) * 100, 0)}% of noise draws would be.`;
-  if (upper < 0.1) return `<b>Borderline</b>: ${fmt(upper * 100, 1)}% of noise draws are at least this large.`;
-  return `<b style="color:var(--res-u)">Typical</b>: ${fmt(upper * 100, 0)}% of noise draws are at least this large.`;
+/** one-line reading of a tail probability, with a count from simulated repeats */
+function reading(k, z) {
+  const upper = chiSf(k, z), lower = 1 - upper, { count, n } = simTail(k, z);
+  const pct = (p) => fmt(p * 100, p < 0.1 ? 1 : 0) + '%';
+  const tail = `If the model were true, ${pct(upper)} of repeated experiments would give a value at least this large (simulated: ${count} of ${n}).`;
+  let tag;
+  if (upper < 0.01) tag = '<b style="color:var(--resid)">Far in the right tail.</b>';
+  else if (upper < 0.05) tag = '<b style="color:var(--resid)">Right tail.</b>';
+  else if (lower < 0.05) tag = '<b>Left tail: unusually small.</b>';
+  else if (upper < 0.1) tag = '<b>Borderline.</b>';
+  else tag = '<b style="color:var(--res-u)">Typical.</b>';
+  return `${tag} ${tail}`;
 }
 function fitSection() {
   const f = solve(state.x, state.y), s2 = state.sigma * state.sigma;
@@ -462,9 +472,9 @@ function fitSection() {
   const c = modelC(state), tot = dot(sub(state.y, c), sub(state.y, c)), rss = dot(f.r, f.r), abs = Math.max(tot - rss, 0);
   const z1 = rss / s2, z2 = abs / s2, z3 = tot / s2;
   chi1(z1, 'RSS / σ²'); chi3(z3, '‖y − c‖² / σ²'); chi2(z2, '‖ŷ − c‖² / σ²');
-  $('v1').innerHTML = reading(1, z1, 'this RSS');
-  $('v3').innerHTML = reading(3, z3, 'this error');
-  $('v2').innerHTML = reading(2, z2, 'this distance');
+  $('v1').innerHTML = reading(1, z1);
+  $('v3').innerHTML = reading(3, z3);
+  $('v2').innerHTML = reading(2, z2);
   const p1 = chiSf(1, z1), p2 = chiSf(2, z2), p3 = chiSf(3, z3);
   const sg = fmt(state.sigma);
   let v;

@@ -1,6 +1,6 @@
 /* Explorer page: everything in one view. Shared pieces live in lib.js. */
 import {
-  createState, createScatter, createModelView, createHistView, buildSliders, xSliders, ySliders, abSliders, sigmaSlider,
+  createState, setHTML, typeset, createScatter, createModelView, createHistView, buildSliders, xSliders, ySliders, abSliders, sigmaSlider,
   solve, fitParams, setCenter, modelC, xbasis, xbar, dot, add, sub, scale, gauss, fmt, vfmt, clamp, colors, ONES,
 } from './lib.js';
 
@@ -46,10 +46,13 @@ const hist = createHistView($('hist'), state);
 /* ------------------------------------------------------------- readout */
 function drawReadout(f) {
   const { x, y, sigma, center } = state;
-  const xb = xbasis(state), xs = center ? '(x − x̄)' : 'x';
+  const xb = xbasis(state);
+  const xv = center ? String.raw`\mathbf x - \bar x\mathbf 1` : String.raw`\mathbf x`;   // second spanning vector
+  const xs = center ? String.raw`(x - \bar x)` : 'x';
+  const xp = center ? String.raw`(\mathbf x - \bar x\mathbf 1)` : String.raw`\mathbf x`;   // same, parenthesised when it follows a scalar
   const host = $('readout');
   if (f.degenerate) {
-    host.innerHTML = '<div class="warn">All x values are equal, so 1 and x point the same way: the "plane" collapses to a line and the model has only p = 1 free parameter. Spread the x values out to see the plane.</div>';
+    setHTML(host, String.raw`<div class="warn">All \(x\) values are equal, so \(\mathbf 1\) and \(\mathbf x\) point the same way: the "plane" collapses to a line and the model has only \(p = 1\) free parameter. Spread the \(x\) values out to see the plane.</div>`);
     return;
   }
   const { r, u, yhat } = f;
@@ -58,24 +61,26 @@ function drawReadout(f) {
   const tot = dot(e, e), resid = dot(e, u) ** 2, absorbed = tot - resid;
   const cosT = dot(ONES, xb) / (Math.sqrt(3) * Math.hypot(...xb)), ang = Math.acos(clamp(cosT, -1, 1)) * 180 / Math.PI;
   const kv = (k, v) => `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
-  host.innerHTML =
-    kv('angle between 1 and ' + (center ? 'x − x̄' : 'x'), `${fmt(ang, 1)}°  ${Math.abs(ang - 90) < 0.05 ? '(perpendicular)' : '(oblique: cos θ = ' + fmt(cosT, 3) + ')'}`) +
-    kv('least-squares fit', `ŷ = ${fmt(center ? f.a + f.b * xbar(x) : f.a)} ${f.b < 0 ? '−' : '+'} ${fmt(Math.abs(f.b))}·${xs}`) +
-    kv(`fitted vector ŷ = â·1 + b̂·${xs}`, vfmt(yhat)) +
-    kv('residual vector r = y − ŷ', vfmt(r)) +
-    kv('perpendicular to both spanning vectors', `r·1 = ${fmt(dot(r, ONES))}  (residuals sum to 0)<br>r·${xs} = ${fmt(dot(r, xb))}  (uncorrelated with x)`) +
-    kv('the single free residual direction', `u = ${vfmt(u)}<br>r = (r·u)·u with r·u = ${fmt(dot(r, u))}<br>‖r‖² = RSS = ${fmt(dot(r, r))} = (r·u)²`) +
-    kv(`treat c as the truth, ε = y − c  (σ = ${fmt(sigma)})`, `‖ε‖²/σ² = ${fmt(tot)} = <b style="color:${col.fit}">${fmt(absorbed)}</b> absorbed (2 df) + <b style="color:${col.resid}">${fmt(resid)}</b> left over (1 df)`) +
-    kv('RSS / σ², df = n − p = 1', `${fmt(resid)}   ~ χ²₁ if the model is right`) +
-    kv('estimated vs true noise', `σ̂² = RSS/(n − p) = ${fmt(dot(r, r))}<br>true σ² = ${fmt(sigma * sigma)}`);
+  const level = fmt(center ? f.a + f.b * xbar(x) : f.a), slope = `${f.b < 0 ? '-' : '+'} ${fmt(Math.abs(f.b))}`;
+  setHTML(host,
+    kv(String.raw`angle between \(\mathbf 1\) and \(${xv}\)`, String.raw`${fmt(ang, 1)}°  ${Math.abs(ang - 90) < 0.05 ? '(perpendicular)' : String.raw`(oblique: \(\cos\theta = ${fmt(cosT, 3)}\))`}`) +
+    kv('least-squares fit', String.raw`\(\hat y = ${level} ${slope}\,${xs}\)`) +
+    kv(String.raw`fitted vector \(\hat{\mathbf y} = \hat a\mathbf 1 + \hat b\,${xp}\)`, vfmt(yhat)) +
+    kv(String.raw`residual vector \(\mathbf r = \mathbf y - \hat{\mathbf y}\)`, vfmt(r)) +
+    kv('perpendicular to both spanning vectors', String.raw`\(\mathbf r\cdot\mathbf 1 = ${fmt(dot(r, ONES))}\)  (residuals sum to 0)<br>\(\mathbf r\cdot${xp} = ${fmt(dot(r, xb))}\)  (uncorrelated with \(x\))`) +
+    kv('the single free residual direction', String.raw`\(\mathbf u =\) ${vfmt(u)}<br>\(\mathbf r = (\mathbf r\cdot\mathbf u)\,\mathbf u\), with \(\mathbf r\cdot\mathbf u = ${fmt(dot(r, u))}\)<br>\(\lVert\mathbf r\rVert^2 = \mathrm{RSS} = ${fmt(dot(r, r))} = (\mathbf r\cdot\mathbf u)^2\)`) +
+    kv(String.raw`treat \(\mathbf c\) as the truth, \(\boldsymbol\varepsilon = \mathbf y - \mathbf c\)  (\(\sigma = ${fmt(sigma)}\))`, String.raw`\(\lVert\boldsymbol\varepsilon\rVert^2/\sigma^2 = ${fmt(tot)}\) = <b style="color:${col.fit}">${fmt(absorbed)}</b> absorbed (2 df) + <b style="color:${col.resid}">${fmt(resid)}</b> left over (1 df)`) +
+    kv(String.raw`\(\mathrm{RSS}/\sigma^2\), df \(= n - p = 1\)`, String.raw`\(${fmt(resid)} \sim \chi^2_1\) if the model is right`) +
+    kv('estimated vs true noise', String.raw`\(\hat\sigma^2 = \mathrm{RSS}/(n-p) = ${fmt(dot(r, r))}\)<br>true \(\sigma^2 = ${fmt(sigma * sigma)}\)`));
 }
 
 /* -------------------------------------------------------------- render */
 function renderAll() {
   const f = solve(state.x, state.y);
-  modelHead.textContent = state.center ? 'Your model  y = a + b·(x − x̄)' : 'Your model  y = a + b·x';
+  setHTML(modelHead, state.center ? String.raw`Your model \(y = a + b\,(x - \bar x)\)` : String.raw`Your model \(y = a + b\,x\)`);
   refreshX(); refreshY(); refreshAB(); refreshSigma();
   scatter(); model(); drawReadout(f); hist($('stat').value);
 }
 state.on(renderAll);
 renderAll();
+typeset(document.body);

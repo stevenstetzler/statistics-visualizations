@@ -1,22 +1,5 @@
-import { createState, createScatter, createParamView, createModelView, createHistView, histStats, createChiPlot, chiSf, buildSliders, xSliders, ySliders, abSliders, sigmaSlider,
+import { createState, createScatter, createParamView, createModelView, createHistView, histStats, createChiPlot, chiSf, simTail, typeset, setHTML, buildSliders, xSliders, ySliders, abSliders, sigmaSlider,
   solve, fitParams, bootstrapSamples, MODES, setCenter, modelC, xbasis, xbar, covHTML, dot, sub, ONES, fmt, vfmt, clamp, gauss, add, scale, norm, colors } from './lib.js';
-
-/* math typesetting (KaTeX auto-render, vendored in vendor/katex) */
-const TEX = {
-  delimiters: [{ left: '$$', right: '$$', display: true }, { left: '\\(', right: '\\)', display: false }],
-  throwOnError: false,
-  trust: (c) => c.command === '\\htmlClass',
-  macros: {
-    '\\ycol': '\\htmlClass{m-data}{\\mathbf{y}}',
-    '\\yhcol': '\\htmlClass{m-fit}{\\hat{\\mathbf{y}}}',
-    '\\ccol': '\\htmlClass{m-cand}{\\mathbf{c}}',
-    '\\rcol': '\\htmlClass{m-resid}{\\mathbf{r}}',
-    '\\ucol': '\\htmlClass{m-u}{\\mathbf{u}}',
-  },
-};
-const typeset = (el) => { if (window.renderMathInElement) window.renderMathInElement(el, TEX); };
-/** set innerHTML and typeset any math in it */
-const setHTML = (el, html) => { el.innerHTML = html; typeset(el); };
 
 const DEFAULT = { x: [0, 1, 2], y: [1, 2.6, 3], a: 0.5, b: 1.2, sigma: 1, center: false, cloudCenter: 'c' };
 const state = createState(DEFAULT);
@@ -126,14 +109,18 @@ function histNote(st) {
   return String.raw`<p>${what}${extra} If you use the wrong \(\sigma\) the whole histogram scales, whatever df you use.</p>`;
 }
 
-/** one-line reading of a tail probability */
-function reading(k, z, what) {
-  const upper = chiSf(k, z), lower = 1 - upper;
-  if (upper < 0.01) return `<b style="color:var(--resid)">Far in the right tail</b>: noise this size would exceed ${what} only ${fmt(upper * 100, 1)}% of the time.`;
-  if (upper < 0.05) return `<b style="color:var(--resid)">Right tail</b>: only ${fmt(upper * 100, 1)}% of noise draws are this large.`;
-  if (lower < 0.05) return `<b>Left tail</b>: closer than ${fmt((1 - lower) * 100, 0)}% of noise draws would be.`;
-  if (upper < 0.1) return `<b>Borderline</b>: ${fmt(upper * 100, 1)}% of noise draws are at least this large.`;
-  return `<b style="color:var(--res-u)">Typical</b>: ${fmt(upper * 100, 0)}% of noise draws are at least this large.`;
+/** one-line reading of a tail probability, with a count from simulated repeats */
+function reading(k, z) {
+  const upper = chiSf(k, z), lower = 1 - upper, { count, n } = simTail(k, z);
+  const pct = (p) => fmt(p * 100, p < 0.1 ? 1 : 0) + '%';
+  const tail = `If the model were true, ${pct(upper)} of repeated experiments would give a value at least this large (simulated: ${count} of ${n}).`;
+  let tag;
+  if (upper < 0.01) tag = '<b style="color:var(--resid)">Far in the right tail.</b>';
+  else if (upper < 0.05) tag = '<b style="color:var(--resid)">Right tail.</b>';
+  else if (lower < 0.05) tag = '<b>Left tail: unusually small.</b>';
+  else if (upper < 0.1) tag = '<b>Borderline.</b>';
+  else tag = '<b style="color:var(--res-u)">Typical.</b>';
+  return `${tag} ${tail}`;
 }
 function fitSection() {
   const f = solve(state.x, state.y), s2 = state.sigma * state.sigma;
@@ -141,9 +128,9 @@ function fitSection() {
   const c = modelC(state), tot = dot(sub(state.y, c), sub(state.y, c)), rss = dot(f.r, f.r), abs = Math.max(tot - rss, 0);
   const z1 = rss / s2, z2 = abs / s2, z3 = tot / s2;
   chi1(z1, 'RSS / σ²'); chi3(z3, '‖y − c‖² / σ²'); chi2(z2, '‖ŷ − c‖² / σ²');
-  $('v1').innerHTML = reading(1, z1, 'this RSS');
-  $('v3').innerHTML = reading(3, z3, 'this error');
-  $('v2').innerHTML = reading(2, z2, 'this distance');
+  $('v1').innerHTML = reading(1, z1);
+  $('v3').innerHTML = reading(3, z3);
+  $('v2').innerHTML = reading(2, z2);
   const p1 = chiSf(1, z1), p2 = chiSf(2, z2), p3 = chiSf(3, z3);
   const sg = fmt(state.sigma);
   let v;

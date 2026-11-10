@@ -7,6 +7,9 @@
 <style>
 /*__CSS__*/
 </style>
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<script defer src="vendor/katex/katex.min.js"></script>
+<script defer src="vendor/katex/auto-render.min.js"></script>
 <script type="importmap">
 { "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/" } }
 </script>
@@ -16,23 +19,23 @@
   <main id="stage">
     <div id="view"></div>
     <div id="legend">
-      <div class="lg"><i style="background:var(--data)"></i><b>y</b> your data, one point in ℝ³</div>
-      <div class="lg"><i style="background:var(--model)"></i><b>model plane</b> = every line a + b·x</div>
-      <div class="lg"><i style="background:var(--fit)"></i><b>ŷ</b> closest point on the plane</div>
-      <div class="lg"><i style="background:var(--resid)"></i><b>r = y − ŷ</b> ⟂ plane (the 1-D residual space)</div>
-      <div class="lg"><i style="background:var(--cand)"></i><b>c = a·1 + b·x</b> the model you chose</div>
+      <div class="lg"><i style="background:var(--data)"></i>\(\ycol\) your data, one point in \(\mathbb R^3\)</div>
+      <div class="lg"><i style="background:var(--model)"></i><b>model plane</b> = every line \(a + b\,x\)</div>
+      <div class="lg"><i style="background:var(--fit)"></i>\(\yhcol\) closest point on the plane</div>
+      <div class="lg"><i style="background:var(--resid)"></i>\(\rcol = \mathbf y - \hat{\mathbf y}\) \(\perp\) plane (the 1-D residual space)</div>
+      <div class="lg"><i style="background:var(--cand)"></i>\(\ccol = a\mathbf 1 + b\mathbf x\) the model you chose</div>
     </div>
     <div id="hint">drag to rotate · scroll to zoom · right-drag to pan</div>
   </main>
   <aside id="side">
     <h1>Data, model, residuals</h1>
     <p class="small" style="margin:0 0 6px"><a href="tutorial.html" style="color:var(--fit)">Step-by-step tutorial →</a></p>
-    <p class="lede">Three observations are <em>one point</em> in ℝ³. A line <code>y = a + b·x</code> can only reach a 2-D plane of that space. Fitting drops a perpendicular; what is left lives in the remaining <b>n − p = 1</b> direction.</p>
+    <p class="lede">Three observations are <em>one point</em> in \(\mathbb R^3\). A line \(y = a + b\,x\) can only reach a 2-D plane of that space. Fitting drops a perpendicular; what is left lives in the remaining <b>\(n - p = 1\)</b> direction.</p>
 
     <section>
       <h2>The usual picture</h2>
       <svg id="scatter" viewBox="0 0 320 230" role="img" aria-label="Scatter plot of three points with a fitted line"></svg>
-      <p class="small">Drag a point up/down. <span class="sw" style="background:var(--fit)"></span>least-squares line, <span class="sw" style="background:var(--cand)"></span>your (a, b) line.</p>
+      <p class="small">Drag a point up/down. <span class="sw" style="background:var(--fit)"></span>least-squares line, <span class="sw" style="background:var(--cand)"></span>your \((a, b)\) line.</p>
     </section>
 
     <section>
@@ -52,7 +55,7 @@
 
     <section>
       <h2>Where χ² comes from</h2>
-      <p class="small">Treat <b>c</b> as the true model and add Gaussian noise ε ~ N(0, σ²I). Each dot in 3-D is a possible dataset <b>y = c + ε</b>.</p>
+      <p class="small">Treat \(\mathbf c\) as the true model and add Gaussian noise \(\boldsymbol\varepsilon \sim \mathcal N(0, \sigma^2 I)\). Each dot in 3-D is a possible dataset \(\mathbf y = \mathbf c + \boldsymbol\varepsilon\).</p>
       <div id="noiseSliders"><div class="small">Data noise</div></div>
       <div class="row">
         <button id="draw">Draw data from the model</button>
@@ -76,7 +79,7 @@
         </select>
       </div>
       <svg id="hist" viewBox="0 0 320 170" role="img" aria-label="Histogram of squared lengths versus chi-square density"></svg>
-      <p class="small">Bars: 4000 simulated datasets from the cloud chosen above. Curve: χ² density. For the data-driven clouds the scale is σ̂² = RSS/(n − p), so there is no marker. <span class="sw" style="background:var(--data)"></span>marker: your current y.</p>
+      <p class="small">Bars: 4000 simulated datasets from the cloud chosen above. Curve: \(\chi^2\) density. For the data-driven clouds the scale is \(\hat\sigma^2 = \mathrm{RSS}/(n-p)\), so there is no marker. <span class="sw" style="background:var(--data)"></span>marker: your current y.</p>
     </section>
   </aside>
 </div>

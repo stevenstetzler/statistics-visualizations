@@ -49,3 +49,10 @@ button:hover{border-color:var(--fit)}
   #side{border-left:0;border-top:1px solid var(--line)}
   #legend{display:none}
 }
+
+/* math (KaTeX) */
+.katex{font-size:1.05em}
+.katex svg{background:none;border:0;border-radius:0;height:inherit;display:block;touch-action:auto}
+.m-data{color:var(--data)}.m-fit{color:var(--fit)}.m-cand{color:var(--cand)}.m-resid{color:var(--resid)}.m-u{color:var(--res-u)}
+.kv .v .katex{font-size:1em}
+.card h3 .katex,h2 .katex{text-transform:none}
