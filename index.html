@@ -14,7 +14,9 @@ h1{font-size:28px;margin:0 0 6px;letter-spacing:-.01em}
 .sub{color:var(--muted);margin:0 0 32px}
 ul{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
 li{padding:18px 0;border-bottom:1px solid var(--line)}
-li a{color:var(--link);font-size:18px}
+li b{font-size:18px}
+li a{color:var(--link)}
+.links{margin-left:6px;color:var(--muted)}
 li p{margin:6px 0 0;color:var(--muted)}
 </style>
 </head>
@@ -24,7 +26,7 @@ li p{margin:6px 0 0;color:var(--muted)}
 <p class="sub">Interactive explanations of statistical ideas.</p>
 <ul>
   <li>
-    <b><a href="dof/">Exploring Model Fit Degrees of Freedom</a></b>
+    <b>Exploring Model Fit Degrees of Freedom</b> <span class="links">[<a href="dof/tutorial.html">tutorial</a>, <a href="dof/">viz</a>]</span>
     <p>Why does fitting a line to three points leave only one degree of freedom? A 3D picture of data as a single point, the model as a plane, and the residual as the direction left over, followed by how noise in the data becomes χ² for the residual and a covariance ellipse for the fitted parameters.</p>
   </li>
 </ul>
