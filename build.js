@@ -1,10 +1,10 @@
-// Builds docs/dof/index.html and docs/dof/tutorial.html (three.js vendored next to them).
+// Builds dof/index.html and dof/tutorial.html (three.js vendored next to them).
 // Usage: npm install && npm run build
 const fs = require('fs');
 const path = require('path');
 
 const root = __dirname;
-const out = path.join(root, 'docs', 'dof');
+const out = path.join(root, 'dof');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
 // vendor three.js + OrbitControls so the page works offline / on GitHub Pages
@@ -18,12 +18,12 @@ const html = read('src/template.html')
   .replace('/*__JS__*/', () => read('src/app.js'));
 
 fs.writeFileSync(path.join(out, 'index.html'), html);
-console.log('wrote docs/dof/index.html (' + html.length + ' bytes)');
+console.log('wrote dof/index.html (' + html.length + ' bytes)');
 
-// tutorial.html: inline page script, shared lib served as docs/dof/lib.js
+// tutorial.html: inline page script, shared lib served as dof/lib.js
 fs.copyFileSync(path.join(root, 'src/lib.js'), path.join(out, 'lib.js'));
 const tut = read('src/tutorial.html')
   .replace('/*__CSS__*/', () => read('src/style.css') + '\n' + read('src/tutorial.css'))
   .replace('/*__JS__*/', () => read('src/tutorial.js').replace("from './lib.js'", "from './lib.js'"));
 fs.writeFileSync(path.join(out, 'tutorial.html'), tut);
-console.log('wrote docs/dof/tutorial.html (' + tut.length + ' bytes)');
+console.log('wrote dof/tutorial.html (' + tut.length + ' bytes)');
