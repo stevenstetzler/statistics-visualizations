@@ -1,0 +1,22 @@
+{
+  "name": "statistics-visualizations",
+  "version": "1.0.0",
+  "description": "Interactive statistics visualizations",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stevenstetzler/statistics-visualizations.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/stevenstetzler/statistics-visualizations/issues"
+  },
+  "homepage": "https://github.com/stevenstetzler/statistics-visualizations#readme",
+  "dependencies": {
+    "three": "^0.160.0"
+  }
+}
