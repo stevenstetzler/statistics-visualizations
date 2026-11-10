@@ -1,5 +1,5 @@
 import { createState, createScatter, createParamView, createModelView, buildSliders, xSliders, ySliders, abSliders, sigmaSlider,
-  solve, fitParams, setCenter, modelC, xbasis, xbar, covHTML, dot, sub, ONES, fmt, vfmt, clamp, gauss, add, scale, norm, colors } from './lib.js';
+  solve, fitParams, bootstrapSamples, MODES, setCenter, modelC, xbasis, xbar, covHTML, dot, sub, ONES, fmt, vfmt, clamp, gauss, add, scale, norm, colors } from './lib.js';
 
 const DEFAULT = { x: [0, 1, 2], y: [0, 3, 0], a: 2, b: -0.5, sigma: 1, center: false, cloudCenter: 'c' };
 const state = createState(DEFAULT);
@@ -65,9 +65,25 @@ function readouts() {
   $('ro4').innerHTML = covHTML(state) + kv('your dataset\'s fit (â, b̂)', `(${fmt(p.a)}, ${fmt(p.b)})`);
 }
 
+function modeNote() {
+  const mode = state.cloudCenter, S = bootstrapSamples(state);
+  const stats = {
+    c: 'Centered on the true c with the true noise: this is the actual sampling distribution of (â, b̂). Both contours should hug the dots.',
+    fit: 'Centered on your fit ŷ, with Gaussian noise of standard deviation σ (the slider stands in for σ̂). The cloud has the same shape as the truth cloud, but the dots now center on your (â, b̂), not on the truth.',
+    resid: 'Each resample is ŷ plus the three residuals redrawn with replacement. The σ slider is ignored: the noise comes from the data. The residual vector always points along u (for equally spaced x it is (c, −2c, c)), so there are only a handful of different datasets, and the dots form a few clumps.',
+    pairs: '',
+  };
+  let h = `<p><b>${MODES[mode]}.</b> ${stats[mode]}</p>`;
+  if (mode === 'pairs') {
+    const bad = S.filter((t) => !t.raw).length, perfect = S.filter((t) => t.raw && t.distinct === 2).length;
+    h = `<p><b>${MODES[mode]}.</b> Each resample draws 3 of your (x, y) pairs with replacement, so it has its own x and its own plane. The σ slider is ignored. Of the ${S.length} resamples drawn here: <b>${bad}</b> had all x equal (the slope is undefined, so no dot) and <b>${perfect}</b> used only two distinct points (a perfect fit, zero residual). The remaining resamples use all three points again, which just reproduces your original fit. The 3-D cloud shows only the resampled y vectors, at most 27 distinct points.</p>`;
+  }
+  $('modeNote').innerHTML = h;
+}
+
 function renderAll() {
   refresh.forEach((r) => r());
-  setupTable(); readouts();
+  setupTable(); readouts(); modeNote();
   scatter(); model3d(); noise3d(); param(true);
 }
 state.on(renderAll);

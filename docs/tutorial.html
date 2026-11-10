@@ -90,6 +90,11 @@ table.data th{color:var(--muted);font-weight:600}
 .stack{display:grid;gap:10px}
 @media (max-width:900px){.cols,.cols.wide{grid-template-columns:1fr}.view3d{height:360px}}
 
+table.cmp{border-collapse:collapse;margin:14px 0;font-size:13.5px;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+table.cmp th,table.cmp td{padding:7px 10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+table.cmp th{color:var(--muted);font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+@media (max-width:900px){table.cmp{display:block;overflow-x:auto}}
+
 </style>
 <script type="importmap">
 { "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/" } }
@@ -155,12 +160,24 @@ table.data th{color:var(--muted);font-weight:600}
 <div class="eq">(â, b̂)ᵀ = (XᵀX)⁻¹Xᵀ<b>y</b> &nbsp;⟹&nbsp; Cov(â, b̂) = (XᵀX)⁻¹Xᵀ · σ²I · X(XᵀX)⁻¹ = σ² (XᵀX)⁻¹</div>
 <p>In words: the covariance of the parameters is the covariance of <b>y</b>, pushed through the linear map that turns data into parameters. Because <b>1</b> and <b>x</b> are generally not perpendicular, the (a, b) grid on the plane is slanted, which tilts the ellipse: â and b̂ are correlated. Tick <i>center x</i> to make <b>1</b> ⟂ <b>x</b> − x̄ and the tilt disappears.</p>
 
+<h2>Where should the cloud come from?</h2>
+<p>The orange dataset is a single draw. To say how much the fit would wobble from draw to draw we need many datasets, and there are four standard ways to get them. They differ in <b>where they are centered</b> and <b>where the noise comes from</b>.</p>
+<table class="cmp">
+<tr><th>Cloud</th><th>Centered on</th><th>Noise comes from</th><th>Needs</th><th>With n = 3</th></tr>
+<tr><td><b>Truth c</b><br><span class="small">the sampling distribution</span></td><td>the true c = a·1 + b·x</td><td>the true N(0, σ²)</td><td>c and σ, known. Only possible in a simulation like this one.</td><td>Exact. Ellipse = σ²(XᵀX)⁻¹.</td></tr>
+<tr><td><b>Parametric</b><br><span class="small">bootstrap</span></td><td>the fit ŷ</td><td>a Gaussian N(0, σ̂²)</td><td>the model is right. The σ slider plays the role of σ̂.</td><td>Same shape as the truth cloud, but sitting on your fit. Accuracy depends on σ̂.</td></tr>
+<tr><td><b>Residual</b><br><span class="small">bootstrap</span></td><td>the fit ŷ</td><td>your own residuals, drawn with replacement</td><td>errors that are iid, but no assumed shape.</td><td>Poor. There is effectively one residual, (c, −2c, c), so every resample is a rearrangement of the same three numbers.</td></tr>
+<tr><td><b>Pairs</b><br><span class="small">(case) bootstrap</span></td><td>nothing: the observations themselves</td><td>resampled (xᵢ, yᵢ) pairs</td><td>observations that are iid draws, with x random too.</td><td>Breaks down. Only 27 possible resamples. 3 have identical x (no slope), 18 use two distinct points (a perfect line), and the other 6 just reorder your original three points.</td></tr>
+</table>
+<p>Geometrically, the first three all keep the plane fixed and scatter <b>y</b> around a center, so fitting just projects the cloud onto the plane. The <b>pairs bootstrap is different</b>: resampling pairs changes <b>x</b> too, so every resample has its own plane and its own residual direction. There is no single plane to project onto, which is why the blue "fits" disappear in that mode.</p>
+
 <div class="toolbar">
-  <span class="lab">Point cloud centered on</span>
-  <span class="seg" id="ccSeg"><button data-v="c" class="on">hypothesized truth c</button><button data-v="fit">fit ŷ (bootstrap)</button></span>
+  <span class="lab">Cloud</span>
+  <span class="seg" id="ccSeg"><button data-v="c" class="on">truth c</button><button data-v="fit">parametric (ŷ)</button><button data-v="resid">residual (ŷ)</button><button data-v="pairs">pairs</button></span>
   <label class="chk"><input type="checkbox" id="centerX"> center x</label>
   <button id="draw">Draw a dataset from the truth</button>
 </div>
+<div id="modeNote" class="callout" style="margin-top:0"></div>
 <div class="cols wide">
   <div class="stack">
     <div class="card"><h3>Parameter space (a, b)</h3><svg id="paramSvg" role="img" aria-label="Scatter of fitted a and b over many simulated datasets, with covariance ellipses"></svg>
@@ -173,12 +190,12 @@ table.data th{color:var(--muted);font-weight:600}
   </div>
 </div>
 <div class="callout">
-  <p><b>Hypothesized truth vs fit.</b> With the cloud centered on <b>c</b>, the dots in parameter space center on the true (a, b): that is the sampling distribution of the estimator. In practice you do not know <b>c</b>, so you center on the fit <b>ŷ</b> instead and re-simulate (the parametric bootstrap). The ellipse then sits on your fitted (â, b̂) and is an estimate of your uncertainty. Try both, and try shrinking and growing σ or spreading the x values: more spread in x makes the ellipse for b̂ narrower.</p>
+  <p><b>What to take away.</b> Truth and parametric clouds agree in shape, because (â, b̂) is a fixed linear map of y and only the center moves. In practice only the fit-centered ones are available, and each trades an assumption for accuracy: the parametric one assumes Gaussian noise and uses σ̂; the residual one assumes nothing about the shape but has just n − p = 1 free residual direction to resample; the pairs one assumes nothing about the model but needs many more than three observations to stop producing degenerate resamples. The residual bootstrap also slightly understates the noise, because least squares makes residuals smaller than the true errors (a common fix rescales them by √(n/(n − p))). Try shrinking σ, spreading the x values, and switching modes to see which clouds respond.</p>
 </div>
 </main>
 <script type="module">
 import { createState, createScatter, createParamView, createModelView, buildSliders, xSliders, ySliders, abSliders, sigmaSlider,
-  solve, fitParams, setCenter, modelC, xbasis, xbar, covHTML, dot, sub, ONES, fmt, vfmt, clamp, gauss, add, scale, norm, colors } from './lib.js';
+  solve, fitParams, bootstrapSamples, MODES, setCenter, modelC, xbasis, xbar, covHTML, dot, sub, ONES, fmt, vfmt, clamp, gauss, add, scale, norm, colors } from './lib.js';
 
 const DEFAULT = { x: [0, 1, 2], y: [0, 3, 0], a: 2, b: -0.5, sigma: 1, center: false, cloudCenter: 'c' };
 const state = createState(DEFAULT);
@@ -244,9 +261,25 @@ function readouts() {
   $('ro4').innerHTML = covHTML(state) + kv('your dataset\'s fit (â, b̂)', `(${fmt(p.a)}, ${fmt(p.b)})`);
 }
 
+function modeNote() {
+  const mode = state.cloudCenter, S = bootstrapSamples(state);
+  const stats = {
+    c: 'Centered on the true c with the true noise: this is the actual sampling distribution of (â, b̂). Both contours should hug the dots.',
+    fit: 'Centered on your fit ŷ, with Gaussian noise of standard deviation σ (the slider stands in for σ̂). The cloud has the same shape as the truth cloud, but the dots now center on your (â, b̂), not on the truth.',
+    resid: 'Each resample is ŷ plus the three residuals redrawn with replacement. The σ slider is ignored: the noise comes from the data. The residual vector always points along u (for equally spaced x it is (c, −2c, c)), so there are only a handful of different datasets, and the dots form a few clumps.',
+    pairs: '',
+  };
+  let h = `<p><b>${MODES[mode]}.</b> ${stats[mode]}</p>`;
+  if (mode === 'pairs') {
+    const bad = S.filter((t) => !t.raw).length, perfect = S.filter((t) => t.raw && t.distinct === 2).length;
+    h = `<p><b>${MODES[mode]}.</b> Each resample draws 3 of your (x, y) pairs with replacement, so it has its own x and its own plane. The σ slider is ignored. Of the ${S.length} resamples drawn here: <b>${bad}</b> had all x equal (the slope is undefined, so no dot) and <b>${perfect}</b> used only two distinct points (a perfect fit, zero residual). The remaining resamples use all three points again, which just reproduces your original fit. The 3-D cloud shows only the resampled y vectors, at most 27 distinct points.</p>`;
+  }
+  $('modeNote').innerHTML = h;
+}
+
 function renderAll() {
   refresh.forEach((r) => r());
-  setupTable(); readouts();
+  setupTable(); readouts(); modeNote();
   scatter(); model3d(); noise3d(); param(true);
 }
 state.on(renderAll);

@@ -30,3 +30,8 @@ table.data th{color:var(--muted);font-weight:600}
 .toolbar .lab{font-size:13px;color:var(--muted)}
 .stack{display:grid;gap:10px}
 @media (max-width:900px){.cols,.cols.wide{grid-template-columns:1fr}.view3d{height:360px}}
+
+table.cmp{border-collapse:collapse;margin:14px 0;font-size:13.5px;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+table.cmp th,table.cmp td{padding:7px 10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+table.cmp th{color:var(--muted);font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+@media (max-width:900px){table.cmp{display:block;overflow-x:auto}}

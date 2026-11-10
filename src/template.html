@@ -59,10 +59,12 @@
         <label class="chk"><input type="checkbox" id="cloud" checked> noise cloud</label>
       </div>
       <div class="row">
-        <label for="ccenter">Center cloud on</label>
+        <label for="ccenter">Cloud</label>
         <select id="ccenter">
           <option value="c">model c (hypothesized truth)</option>
           <option value="fit">fit ŷ (parametric bootstrap)</option>
+          <option value="resid">fit ŷ + resampled residuals</option>
+          <option value="pairs">resampled (x, y) pairs</option>
         </select>
       </div>
       <div class="row">

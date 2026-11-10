@@ -44,11 +44,11 @@ export function fitParams(s, y) {
   return { a: s.center ? f.a + f.b * xbar(s.x) : f.a, b: f.b };
 }
 /** covariance of (â, b̂) = σ² (XᵀX)⁻¹ for X = [1, xb] */
-export function covAB(s) {
+export function covAB(s, sigma = s.sigma) {
   const v2 = xbasis(s), g11 = 3, g12 = dot(ONES, v2), g22 = dot(v2, v2);
   const det = g11 * g22 - g12 * g12;
   if (det < 1e-6) return null;
-  const k = s.sigma * s.sigma / det;
+  const k = sigma * sigma / det;
   return { va: k * g22, vb: k * g11, cab: -k * g12 };
 }
 
@@ -67,9 +67,35 @@ export function createState(init) {
   s.snapshot = () => ({ ...init, x: [...init.x], y: [...init.y] });
   return s;
 }
-/** centre of the simulated noise cloud */
+/** fixed random picks (0..2) used by the residual and pairs bootstraps */
+export const IDX = Array.from({ length: N_CLOUD }, () => [0, 1, 2].map(() => Math.floor(rng() * 3)));
+export const MODES = {
+  c: 'hypothesized truth c',
+  fit: 'parametric bootstrap (ŷ + Gaussian noise)',
+  resid: 'residual bootstrap (ŷ + resampled residuals)',
+  pairs: 'pairs bootstrap (resampled (x, y) pairs)',
+};
+/**
+ * Simulated datasets for the current cloud mode. Each sample has its own x (only the pairs
+ * bootstrap changes it), its y vector in ℝ³, and its least-squares fit in raw (a, b).
+ */
+export function bootstrapSamples(s) {
+  const mode = s.cloudCenter, f = solve(s.x, s.y), c = modelC(s);
+  return EPS.map((e, i) => {
+    let x = s.x, y;
+    if (mode === 'c') y = add(c, scale(e, s.sigma));
+    else if (mode === 'fit') y = add(f.yhat, scale(e, s.sigma));
+    else if (mode === 'resid') y = add(f.yhat, IDX[i].map((k) => f.r[k]));
+    else { x = IDX[i].map((k) => s.x[k]); y = IDX[i].map((k) => s.y[k]); }
+    const g = solve(x, y);
+    return { x, y, raw: g.degenerate ? null : { a: g.a, b: g.b }, distinct: new Set(IDX[i]).size };
+  });
+}
+/** raw (a, b) -> the parametrisation currently selected (centred or not) */
+export const toParam = (s, raw) => ({ a: s.center ? raw.a + raw.b * xbar(s.x) : raw.a, b: raw.b });
+/** centre of the 3-D cloud, for labels */
 export function cloudCenter(s) {
-  return s.cloudCenter === 'fit' ? solve(s.x, s.y).yhat : modelC(s);
+  return s.cloudCenter === 'c' ? modelC(s) : solve(s.x, s.y).yhat;
 }
 /** switch parametrisation but keep the same point c in 3-D */
 export function setCenter(s, on) {
@@ -167,31 +193,45 @@ export function createParamView(svg, state) {
   const ax = svgEl('text', { x: (M.l + W - M.r) / 2, y: H - 3, 'text-anchor': 'middle', fill: col.muted, 'font-size': 11, 'font-style': 'italic' }, stat);
   const ay = svgEl('text', { x: 11, y: H / 2, 'text-anchor': 'middle', fill: col.muted, 'font-size': 11, 'font-style': 'italic', transform: `rotate(-90 11 ${H / 2})` }, stat);
   const mark = (x, y, color, text, dy = -9) => { svgEl('circle', { cx: px(x), cy: py(y), r: 5, fill: color, stroke: 'white', 'stroke-width': 1.5 }, dyn); svgEl('text', { x: px(x) + 8, y: py(y) + dy, fill: color, 'font-size': 11, 'font-weight': 600, style: 'paint-order:stroke;stroke:var(--bg);stroke-width:3px' }, dyn).textContent = text; };
+  const ellipse = (ctr, cov, stroke, op, dash, w = 1.5) => {
+    const sq = Math.sqrt(cov.va), l21 = cov.cab / sq, l22 = Math.sqrt(Math.max(cov.vb - l21 * l21, 0));
+    [[2.296, op, ''], [5.991, op * 0.7, dash || '5 4']].forEach(([k2, o, d]) => {
+      let path = '';
+      for (let t = 0; t <= 64; t++) {
+        const th = (t / 64) * 2 * Math.PI, u = Math.sqrt(k2) * Math.cos(th), v = Math.sqrt(k2) * Math.sin(th);
+        path += (t ? 'L' : 'M') + px(ctr.a + sq * u).toFixed(1) + ' ' + py(ctr.b + l21 * u + l22 * v).toFixed(1);
+      }
+      svgEl('path', { d: path, fill: 'none', stroke, 'stroke-width': w, 'stroke-opacity': o, 'stroke-dasharray': d }, dyn);
+    });
+  };
+  const note = (y, text, color) => svgEl('text', { x: W - M.r, y, 'text-anchor': 'end', fill: color, 'font-size': 10 }, dyn).textContent = text;
   return (showCloud) => {
     dyn.innerHTML = '';
     ax.textContent = state.center ? 'a  (level at x̄)' : 'a  (intercept)';
     ay.textContent = 'b  (slope)';
-    const cov = covAB(state);
     const truth = { a: state.a, b: state.b };
     const obs = fitParams(state, state.y);
-    const ctr = state.cloudCenter === 'fit' ? obs : truth;
+    const mode = state.cloudCenter;
     if (showCloud) {
-      for (let i = 0; i < N_CLOUD; i++) {
-        const y = add(cloudCenter(state), scale(EPS[i], state.sigma));
-        const p = fitParams(state, y);
-        svgEl('circle', { cx: px(p.a), cy: py(p.b), r: 2.2, fill: col.cand, 'fill-opacity': 0.4 }, dyn);
-      }
-      if (cov) {
-        const sq = Math.sqrt(cov.va), l21 = cov.cab / sq, l22 = Math.sqrt(Math.max(cov.vb - l21 * l21, 0));
-        [[2.296, 1, '68%'], [5.991, 0.7, '95%']].forEach(([k2, op, lab], j) => {
-          let d = '';
-          for (let t = 0; t <= 64; t++) {
-            const th = (t / 64) * 2 * Math.PI, u = Math.sqrt(k2) * Math.cos(th), v = Math.sqrt(k2) * Math.sin(th);
-            d += (t ? 'L' : 'M') + px(ctr.a + sq * u).toFixed(1) + ' ' + py(ctr.b + l21 * u + l22 * v).toFixed(1);
-          }
-          svgEl('path', { d, fill: 'none', stroke: col.ink, 'stroke-width': 1.5, 'stroke-opacity': op, 'stroke-dasharray': j ? '5 4' : '' }, dyn);
-        });
-        svgEl('text', { x: W - M.r, y: M.t + 8, 'text-anchor': 'end', fill: col.ink, 'font-size': 10 }, dyn).textContent = 'contours: 68% / 95% from σ²(XᵀX)⁻¹';
+      const pts = bootstrapSamples(state).filter((t) => t.raw).map((t) => toParam(state, t.raw));
+      pts.forEach((p) => svgEl('circle', { cx: px(p.a), cy: py(p.b), r: 2.2, fill: col.cand, 'fill-opacity': 0.4 }, dyn));
+      if (mode === 'c' || mode === 'fit') {
+        const cov = covAB(state);
+        if (cov) { ellipse(mode === 'c' ? truth : obs, cov, col.ink, 1); note(M.t + 8, 'contours 68% / 95%: σ²(XᵀX)⁻¹', col.ink); }
+      } else {
+        // empirical covariance of the dots (solid) vs the formula with σ̂ (dotted)
+        const n = pts.length;
+        if (n > 3) {
+          const ma = pts.reduce((t, p) => t + p.a, 0) / n, mb = pts.reduce((t, p) => t + p.b, 0) / n;
+          const emp = { va: 0, vb: 0, cab: 0 };
+          pts.forEach((p) => { emp.va += (p.a - ma) ** 2 / (n - 1); emp.vb += (p.b - mb) ** 2 / (n - 1); emp.cab += (p.a - ma) * (p.b - mb) / (n - 1); });
+          if (emp.va > 1e-9) ellipse({ a: ma, b: mb }, emp, col.ink, 1);
+        }
+        const f = solve(state.x, state.y), sig = Math.sqrt(dot(f.r, f.r));
+        const th = covAB(state, sig);
+        if (th) ellipse(obs, th, col.fit, 0.9, '', 1.5);
+        note(M.t + 8, 'black: spread of the dots (68% / 95%)', col.ink);
+        note(M.t + 20, 'blue: formula σ̂²(XᵀX)⁻¹, σ̂² = RSS/(n − p)', col.fit);
       }
     }
     mark(truth.a, truth.b, col.cand, 'true (a, b)', 14);
@@ -339,18 +379,18 @@ export function createModelView(container, state, opts = {}) {
     if (epsilon) { dashYtoC.set(c, y); lblE.at(add(c, scale(sub(y, c), 0.5))); lblE.show = norm(sub(y, c)) > 0.4; dashCtoH.set(c, yhat); }
     if (minimal) [lblOne, lblX, lblA, lblBx, lblC].forEach((L) => { L.show = false; });
 
+    const mode = state.cloudCenter;
     const showCl = cloud && state.showCloud !== false && !f.degenerate;
-    cloudPts.visible = showCl; fitPts.visible = showCl && fits;
-    lblCloud.show = showCl && cloudLabels; lblFits.show = showCl && fits && cloudLabels;
+    cloudPts.visible = showCl; fitPts.visible = showCl && fits && mode !== 'pairs';
+    lblCloud.show = showCl && cloudLabels; lblFits.show = showCl && fits && cloudLabels && mode !== 'pairs';
     if (showCl) {
       const cc = cloudCenter(state), p1 = cloudPts.geometry.attributes.position, p2 = fitPts.geometry.attributes.position;
-      for (let i = 0; i < N_CLOUD; i++) {
-        const e = scale(EPS[i], state.sigma), inplane = add(scale(e1, dot(e, e1)), scale(e2, dot(e, e2)));
-        const q = add(cc, e), fq = add(cc, inplane);
+      bootstrapSamples(state).forEach((t, i) => {
+        const q = t.y, fq = add(scale(e1, dot(q, e1)), scale(e2, dot(q, e2))); // projection onto the plane
         p1.setXYZ(i, q[0], q[1], q[2]); p2.setXYZ(i, fq[0], fq[1], fq[2]);
-      }
+      });
       p1.needsUpdate = p2.needsUpdate = true;
-      lblCloud.at(add(cc, [1.3, 1.6, 0]));
+      lblCloud.at(add(cc, [1.3, 1.6, 0]), mode === 'pairs' ? 'resampled y* (each has its own x*)' : mode === 'resid' ? 'ŷ + resampled residuals' : 'possible datasets y');
       lblFits.at(add(cc, scale(e2, 3.4)));
     }
   }
