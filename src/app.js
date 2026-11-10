@@ -1,306 +1,51 @@
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/OrbitControls.js';
+/* Explorer page: everything in one view. Shared pieces live in lib.js. */
+import {
+  createState, createScatter, createModelView, buildSliders, xSliders, ySliders, abSliders, sigmaSlider,
+  solve, fitParams, setCenter, modelC, xbasis, xbar, dot, add, sub, scale, gauss, fmt, vfmt, clamp, colors, ONES,
+} from './lib.js';
 
-/* ------------------------------------------------------------------ state */
-const DEFAULTS = { x: [0, 1, 2], y: [0, 3, 0], a: 2, b: -0.5, sigma: 1 };
-const state = { x: [...DEFAULTS.x], y: [...DEFAULTS.y], a: DEFAULTS.a, b: DEFAULTS.b, sigma: DEFAULTS.sigma, center: false };
+const DEFAULTS = { x: [0, 1, 2], y: [0, 3, 0], a: 2, b: -0.5, sigma: 1, center: false, cloudCenter: 'c', showCloud: true };
+const state = createState(DEFAULTS);
+const $ = (id) => document.getElementById(id);
+const col = colors();
 
-/* ------------------------------------------------------------- small math */
-const dot = (p, q) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2];
-const add = (p, q) => [p[0] + q[0], p[1] + q[1], p[2] + q[2]];
-const sub = (p, q) => [p[0] - q[0], p[1] - q[1], p[2] - q[2]];
-const scale = (p, s) => [p[0] * s, p[1] * s, p[2] * s];
-const cross = (p, q) => [p[1] * q[2] - p[2] * q[1], p[2] * q[0] - p[0] * q[2], p[0] * q[1] - p[1] * q[0]];
-const norm = (p) => Math.hypot(p[0], p[1], p[2]);
-const unit = (p) => { const n = norm(p); return n < 1e-9 ? [0, 0, 0] : scale(p, 1 / n); };
-const ONES = [1, 1, 1];
-const fmt = (v, d = 2) => { const s = (Math.abs(v) < 0.5 * 10 ** -d ? 0 : v).toFixed(d); return s === '-0.00' ? '0.00' : s; };
-const vfmt = (v) => '(' + v.map((t) => fmt(t)).join(', ') + ')';
-const T = (v) => new THREE.Vector3(v[0], v[1], v[2]); // data axes (y1,y2,y3) -> three (X,Y,Z)
+/* ------------------------------------------------------------- sliders */
+const heading = (host, text) => { const h = document.createElement('div'); h.className = 'small'; h.style.marginTop = '10px'; h.textContent = text; host.appendChild(h); return h; };
+const sliderHost = $('sliders');
+heading(sliderHost, 'Predictor values');
+const refreshX = buildSliders(sliderHost, xSliders(), state);
+heading(sliderHost, 'Observed values');
+const refreshY = buildSliders(sliderHost, ySliders(), state);
+const modelHead = heading(sliderHost, '');
+const refreshAB = buildSliders(sliderHost, abSliders(), state);
+const refreshSigma = buildSliders($('noiseSliders'), [sigmaSlider()], state);
 
-/** Least squares for y ≈ a + b x, plus the geometry of the fit. */
-function solve(x, y) {
-  const n = 3;
-  const Sx = x[0] + x[1] + x[2], Sy = y[0] + y[1] + y[2];
-  const Sxx = dot(x, x), Sxy = dot(x, y);
-  const det = n * Sxx - Sx * Sx; // 0 when every x is equal
-  const degenerate = det < 1e-3;
-  let a, b;
-  if (degenerate) { b = 0; a = Sy / n; }
-  else { b = (n * Sxy - Sx * Sy) / det; a = (Sy - b * Sx) / n; }
-  const yhat = add(scale(ONES, a), scale(x, b));
-  const r = sub(y, yhat);
-  // orthonormal frame: e1 ∥ (1,1,1), e2 = x with e1 removed, u ⟂ plane
-  const e1 = unit(ONES);
-  const e2 = unit(sub(x, scale(e1, dot(x, e1))));
-  const u = degenerate ? [0, 0, 0] : unit(cross(e1, e2));
-  return { a, b, yhat, r, e1, e2, u, degenerate };
-}
+/* --------------------------------------------------------------- views */
+const scatter = createScatter($('scatter'), state, { draggable: true, showCand: true, showFit: true });
+const model = createModelView($('view'), state, { cloud: true, fits: false, epsilon: true });
 
-/* model parametrisation: raw  c = a·1 + b·x   or centred  c = a·1 + b·(x − x̄·1) */
-const xbar = (x) => (x[0] + x[1] + x[2]) / 3;
-const xbasis = (x, center) => (center ? sub(x, scale(ONES, xbar(x))) : x);
-const rawLine = (s) => ({ a: s.center ? s.a - s.b * xbar(s.x) : s.a, b: s.b });
-
-/* ----------------------------------------------------------- three.js scene */
-const css = getComputedStyle(document.documentElement);
-const C = (name) => css.getPropertyValue(name).trim();
-const col = { data: C('--data'), fit: C('--fit'), resid: C('--resid'), u: C('--res-u'), cand: C('--cand'), basis: C('--basis'), ink: C('--ink'), muted: C('--muted') };
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => location.reload());
-
-const view = document.getElementById('view');
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-view.appendChild(renderer.domElement);
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 200);
-camera.position.set(15, 4, 8);
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.target.set(0, 0, 0);
-
-const R_AX = 6;       // axis half-length
-const R_PLANE = 5.5;  // plane/lattice clip radius
-
-/* helpers for drawing */
-function tube(color, radius) {
-  const g = new THREE.CylinderGeometry(radius, radius, 1, 12);
-  g.translate(0, 0.5, 0);
-  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color }));
-  m.set = (a, b) => {
-    const A = T(a), B = T(b), d = B.clone().sub(A), len = d.length();
-    m.visible = len > 1e-4;
-    if (!m.visible) return;
-    m.position.copy(A);
-    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.divideScalar(len));
-    m.scale.set(1, len, 1);
-  };
-  scene.add(m);
-  return m;
-}
-function dashed(color, dash = 0.22, gap = 0.14) {
-  const g = new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
-  const l = new THREE.Line(g, new THREE.LineDashedMaterial({ color, dashSize: dash, gapSize: gap }));
-  l.set = (a, b) => {
-    g.attributes.position.set([...a, ...b]);
-    g.attributes.position.needsUpdate = true;
-    l.computeLineDistances();
-    l.visible = norm(sub(a, b)) > 1e-4;
-  };
-  scene.add(l);
-  return l;
-}
-function polyline(color, n) {
-  const g = new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
-  const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color }));
-  l.set = (pts) => { g.attributes.position.set(pts.flat()); g.attributes.position.needsUpdate = true; };
-  scene.add(l);
-  return l;
-}
-function ball(color, r) {
-  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 16), new THREE.MeshBasicMaterial({ color }));
-  scene.add(m);
-  return m;
-}
-function arrow(color, headLen = 0.4, headW = 0.2) {
-  const a = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(), 1, color, headLen, headW);
-  a.set = (from, vec) => {
-    const len = norm(vec);
-    a.visible = len > 1e-4;
-    if (!a.visible) return;
-    a.position.copy(T(from));
-    a.setDirection(T(vec).normalize());
-    a.setLength(len, Math.min(headLen, len * 0.5), headW);
-  };
-  scene.add(a);
-  return a;
-}
-
-/* HTML labels pinned to 3-D positions */
-const labelHost = document.getElementById('labels');
-const labels = [];
-function label(html, color) {
-  const el = document.createElement('div');
-  el.className = 'lbl';
-  el.innerHTML = html;
-  el.style.color = color;
-  labelHost.appendChild(el);
-  const L = { el, pos: new THREE.Vector3(), show: true };
-  L.at = (p, text) => { L.pos.copy(T(p)); if (text !== undefined) el.innerHTML = text; };
-  labels.push(L);
-  return L;
-}
-
-/* axes (one per observation) */
-['y₁', 'y₂', 'y₃'].forEach((name, i) => {
-  const d = [0, 0, 0]; d[i] = 1;
-  const g = new THREE.BufferGeometry().setFromPoints([T(scale(d, -R_AX)), T(scale(d, R_AX))]);
-  scene.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: col.muted, transparent: true, opacity: 0.55 })));
-  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.35, 12), new THREE.MeshBasicMaterial({ color: col.muted }));
-  tip.position.copy(T(scale(d, R_AX)));
-  tip.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), T(d));
-  scene.add(tip);
-  label(`${name} <span style="opacity:.6;font-weight:400">(obs ${i + 1})</span>`, col.muted).at(scale(d, R_AX + 0.5));
-  for (let t = -5; t <= 5; t += 1) {
-    if (t === 0) continue;
-    const p = scale(d, t);
-    const tk = new THREE.BufferGeometry().setFromPoints([T(add(p, [0, 0.08, 0])), T(add(p, [0, -0.08, 0]))]);
-    if (i === 1) tk.setFromPoints([T(add(p, [0.08, 0, 0])), T(add(p, [-0.08, 0, 0]))]);
-    scene.add(new THREE.Line(tk, new THREE.LineBasicMaterial({ color: col.muted, transparent: true, opacity: 0.5 })));
-  }
-});
-scene.add(new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 8), new THREE.MeshBasicMaterial({ color: col.ink })));
-
-/* model plane + parameter lattice */
-const planeMat = new THREE.MeshBasicMaterial({ color: col.fit, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false });
-const plane = new THREE.Mesh(new THREE.CircleGeometry(R_PLANE, 96), planeMat);
-plane.matrixAutoUpdate = false;
-scene.add(plane);
-const rim = new THREE.LineLoop(
-  new THREE.BufferGeometry().setFromPoints(Array.from({ length: 97 }, (_, k) => new THREE.Vector3(Math.cos((k / 96) * 6.2832) * R_PLANE, Math.sin((k / 96) * 6.2832) * R_PLANE, 0))),
-  new THREE.LineBasicMaterial({ color: col.fit, transparent: true, opacity: 0.55 }));
-rim.matrixAutoUpdate = false;
-scene.add(rim);
-let lattice = null;
-function buildLattice(x) { // x here is the second basis vector (x or x − x̄)
-  if (lattice) { scene.remove(lattice); lattice.geometry.dispose(); }
-  const pts = [];
-  const pt = (a, b) => add(scale(ONES, a), scale(x, b));
-  const inside = (p) => norm(p) <= R_PLANE;
-  const trace = (fn) => { // sample a curve, keep consecutive inside pairs
-    let prev = null;
-    for (let s = -10; s <= 10.0001; s += 0.1) {
-      const p = fn(s);
-      if (prev && inside(prev) && inside(p)) pts.push(T(prev), T(p));
-      prev = p;
-    }
-  };
-  for (let a = -6; a <= 6; a++) trace((s) => pt(a, s));        // a = const  (vary b)
-  for (let b = -4; b <= 4; b += 0.5) trace((s) => pt(s, b));   // b = const  (vary a)
-  lattice = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts),
-    new THREE.LineBasicMaterial({ color: col.fit, transparent: true, opacity: 0.22 }));
-  scene.add(lattice);
-}
-
-/* basis vectors 1 and x, and the candidate c = a·1 + b·x built from them */
-const arrOne = arrow(col.basis), arrX = arrow(col.basis);
-const lblOne = label('<b>1</b> = (1,1,1)', col.basis), lblX = label('<b>x</b>', col.basis);
-const legA = tube(col.cand, 0.035), legB = tube(col.cand, 0.035);
-const ballC = ball(col.cand, 0.17);
-const lblC = label('<b>c</b> = a·1 + b·x', col.cand);
-const lblA = label('a·1', col.cand), lblBx = label('b·x', col.cand);
-
-/* data, projection, residual */
-const ballY = ball(col.data, 0.2);
-const lblY = label('<b>y</b> data', col.data);
-const ballH = ball(col.fit, 0.17);
-const lblH = label('<b>ŷ</b> best fit', col.fit);
-const tubeR = tube(col.resid, 0.06);
-const lblR = label('<b>r</b> residual', col.resid);
-const dashYtoC = dashed(col.cand);              // ε = y − c
-const lblE = label('ε', col.cand);
-const dashCtoH = dashed(col.cand, 0.1, 0.1);    // part of ε absorbed by the plane
-const dashLine = dashed(col.resid, 0.35, 0.2);  // residual line extended through ŷ
-const arrU = arrow(col.u, 0.35, 0.18);          // u from the origin: residual space
-const lblU = label('<b>u</b> residual space', col.u);
-const ra1 = polyline(col.resid, 3), ra2 = polyline(col.resid, 3); // right-angle marks
-const ra3 = polyline(col.cand, 3); // right angle between 1 and x − x̄ (centred mode)
-const lblZero = label('', col.muted);
-
-/* noise cloud */
-function mulberry32(a) { return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
-const rng = mulberry32(12345);
-const gauss = () => Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
-const N_HIST = 4000, N_CLOUD = 450;
-const eps = Array.from({ length: N_HIST }, () => [gauss(), gauss(), gauss()]);
-const cloudGeo = new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(N_CLOUD * 3), 3));
-const cloud = new THREE.Points(cloudGeo, new THREE.PointsMaterial({ color: col.cand, size: 0.07, transparent: true, opacity: 0.55, depthWrite: false }));
-scene.add(cloud);
-
-/* -------------------------------------------------------------- UI: sliders */
-const sliderHost = document.getElementById('sliders');
-const sliderDefs = [
-  ...[0, 1, 2].map((i) => ({ key: 'x', i, name: `x${sub_(i + 1)}`, min: -3, max: 3, step: 0.1, group: i === 0 ? 'Predictor values' : '' })),
-  ...[0, 1, 2].map((i) => ({ key: 'y', i, name: `y${sub_(i + 1)}`, min: -5, max: 5, step: 0.1, group: i === 0 ? 'Observed values' : '' })),
-  { key: 'a', name: 'a', min: -8, max: 8, step: 0.05, group: 'Your model  y = a + b·x' },
-  { key: 'b', name: 'b', min: -3, max: 3, step: 0.05, group: '' },
-  { key: 'sigma', name: 'σ', min: 0.1, max: 3, step: 0.05, group: '', host: 'noiseSliders' },
-];
-let modelHead = null;
-function sub_(n) { return '₀₁₂₃₄₅₆₇₈₉'[n]; }
-const sliderEls = sliderDefs.map((d) => {
-  const host = d.host ? document.getElementById(d.host) : sliderHost;
-  if (d.group) { const h = document.createElement('div'); h.className = 'small'; h.style.marginTop = '10px'; h.textContent = d.group; host.appendChild(h); if (d.key === 'a') modelHead = h; }
-  const row = document.createElement('div'); row.className = 'sl';
-  row.innerHTML = `<label>${d.name}</label><input type="range" min="${d.min}" max="${d.max}" step="${d.step}"><output></output>`;
-  const input = row.querySelector('input'), out = row.querySelector('output');
-  input.addEventListener('input', () => { setVal(d, parseFloat(input.value)); update(); });
-  host.appendChild(row);
-  return { d, input, out };
-});
-const getVal = (d) => (d.i === undefined ? state[d.key] : state[d.key][d.i]);
-function setVal(d, v) { if (d.i === undefined) state[d.key] = v; else state[d.key][d.i] = v; }
-
-document.getElementById('snap').onclick = () => {
-  const f = solve(state.x, state.y);
-  state.a = clamp(state.center ? f.a + f.b * xbar(state.x) : f.a, -8, 8); state.b = clamp(f.b, -3, 3); update();
+/* ------------------------------------------------------------- buttons */
+$('snap').onclick = () => { const p = fitParams(state, state.y); state.a = clamp(p.a, -8, 8); state.b = clamp(p.b, -3, 3); state.emit(); };
+$('reset').onclick = () => {
+  setCenter(state, false); $('center').checked = false;
+  state.x = [...DEFAULTS.x]; state.y = [...DEFAULTS.y]; state.a = DEFAULTS.a; state.b = DEFAULTS.b; state.sigma = DEFAULTS.sigma;
+  state.emit();
 };
-document.getElementById('reset').onclick = () => { state.x = [...DEFAULTS.x]; state.y = [...DEFAULTS.y]; state.a = DEFAULTS.a; state.b = DEFAULTS.b; state.sigma = DEFAULTS.sigma; setCenter(false); update(); };
-// switch parametrisation while keeping the same point c in 3-D
-function setCenter(on) {
-  if (on !== state.center) { state.a = clamp(state.a + (on ? 1 : -1) * state.b * xbar(state.x), -8, 8); state.center = on; }
-  document.getElementById('center').checked = on;
-}
-document.getElementById('center').onchange = (ev) => { setCenter(ev.target.checked); update(); };
-document.getElementById('cloud').onchange = () => update();
-document.getElementById('stat').onchange = () => update();
-document.getElementById('ccenter').onchange = () => update();
-document.getElementById('draw').onclick = () => {
+$('center').onchange = (e) => { setCenter(state, e.target.checked); state.emit(); };
+$('cloud').onchange = (e) => { state.showCloud = e.target.checked; state.emit(); };
+$('ccenter').onchange = (e) => { state.cloudCenter = e.target.value; state.emit(); };
+$('stat').onchange = () => state.emit();
+$('draw').onclick = () => {
   const e = [gauss(), gauss(), gauss()];
-  const c = modelC(state);
-  state.y = add(c, scale(e, state.sigma)).map((v) => clamp(Math.round(v * 20) / 20, -5.5, 5.5));
-  update();
+  state.y = add(modelC(state), scale(e, state.sigma)).map((v) => clamp(Math.round(v * 20) / 20, -5.5, 5.5));
+  state.emit();
 };
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
-const modelC = (s) => add(scale(ONES, s.a), scale(xbasis(s.x, s.center), s.b));
-
-/* ------------------------------------------------- UI: 2-D scatter (SVG) */
-const sc = document.getElementById('scatter');
-const SW = 320, SH = 230, SM = { l: 30, r: 10, t: 10, b: 24 };
-const XR = [-3.5, 3.5], YR = [-6, 6];
-const sx = (v) => SM.l + ((v - XR[0]) / (XR[1] - XR[0])) * (SW - SM.l - SM.r);
-const sy = (v) => SH - SM.b - ((v - YR[0]) / (YR[1] - YR[0])) * (SH - SM.t - SM.b);
-const isy = (py) => YR[0] + ((SH - SM.b - py) / (SH - SM.t - SM.b)) * (YR[1] - YR[0]);
-const ns = 'http://www.w3.org/2000/svg';
-function el(tag, attrs, parent) { const e = document.createElementNS(ns, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent || sc).appendChild(e); return e; }
-// static axes
-for (let v = -6; v <= 6; v += 3) { el('line', { x1: SM.l, x2: SW - SM.r, y1: sy(v), y2: sy(v), stroke: col.muted, 'stroke-opacity': v === 0 ? 0.6 : 0.2 }); const t = el('text', { x: SM.l - 5, y: sy(v) + 4, 'text-anchor': 'end', fill: col.muted, 'font-size': 10 }); t.textContent = v; }
-for (let v = -3; v <= 3; v += 1) { el('line', { x1: sx(v), x2: sx(v), y1: SM.t, y2: SH - SM.b, stroke: col.muted, 'stroke-opacity': v === 0 ? 0.6 : 0.2 }); const t = el('text', { x: sx(v), y: SH - 8, 'text-anchor': 'middle', fill: col.muted, 'font-size': 10 }); t.textContent = v; }
-const sCand = el('line', { stroke: col.cand, 'stroke-width': 2 });
-const sFit = el('line', { stroke: col.fit, 'stroke-width': 2.5 });
-const sRes = [0, 1, 2].map(() => el('line', { stroke: col.resid, 'stroke-width': 3, 'stroke-linecap': 'round' }));
-const sPts = [0, 1, 2].map((i) => {
-  const g = el('g', { cursor: 'ns-resize' });
-  el('circle', { r: 16, fill: 'transparent' }, g);
-  el('circle', { r: 6, fill: col.data, stroke: 'white', 'stroke-width': 1.5 }, g);
-  const t = el('text', { fill: col.data, 'font-size': 11, 'font-weight': 600, dx: 9, dy: -8 }, g); t.textContent = `(x${sub_(i + 1)}, y${sub_(i + 1)})`;
-  g.addEventListener('pointerdown', (ev) => {
-    g.setPointerCapture(ev.pointerId);
-    const move = (e2) => {
-      const r = sc.getBoundingClientRect();
-      state.y[i] = clamp(Math.round(isy(((e2.clientY - r.top) / r.height) * SH) * 10) / 10, -5.5, 5.5);
-      update();
-    };
-    g.addEventListener('pointermove', move);
-    g.addEventListener('pointerup', () => g.removeEventListener('pointermove', move), { once: true });
-  });
-  return { g, t };
-});
-
-/* --------------------------------------------------- UI: histogram (SVG) */
-const hs = document.getElementById('hist');
+/* ----------------------------------------------------------- histogram */
+const hs = $('hist');
 const HW = 320, HH = 170, HM = { l: 30, r: 10, t: 10, b: 24 };
+const NS = 'http://www.w3.org/2000/svg';
+const HIST = Array.from({ length: 4000 }, () => [gauss(), gauss(), gauss()]);
 const chiPdf = (k, z) => {
   if (z <= 0) return 0;
   if (k === 1) return Math.exp(-z / 2) / Math.sqrt(2 * Math.PI * z);
@@ -309,18 +54,16 @@ const chiPdf = (k, z) => {
 };
 function drawHist(f) {
   hs.innerHTML = '';
-  const mode = document.getElementById('stat').value;
+  const mode = $('stat').value;
   const k = { res: 1, abs: 2, tot: 3 }[mode];
   const zmax = { res: 6, abs: 10, tot: 12 }[mode];
   const ymax = { res: 1.0, abs: 0.6, tot: 0.3 }[mode];
   const px = (z) => HM.l + (z / zmax) * (HW - HM.l - HM.r);
   const py = (d) => HH - HM.b - (d / ymax) * (HH - HM.t - HM.b);
-  const mk = (tag, a) => { const e = document.createElementNS(ns, tag); for (const q in a) e.setAttribute(q, a[q]); hs.appendChild(e); return e; };
+  const mk = (tag, a) => { const e = document.createElementNS(NS, tag); for (const q in a) e.setAttribute(q, a[q]); hs.appendChild(e); return e; };
   if (f.degenerate) { mk('text', { x: 160, y: 85, 'text-anchor': 'middle', fill: col.muted, 'font-size': 12 }).textContent = 'plane is degenerate (all x equal)'; return; }
-  const zs = eps.map((e) => {
-    const resid = dot(e, f.u) ** 2, tot = dot(e, e);
-    return mode === 'res' ? resid : mode === 'abs' ? tot - resid : tot;
-  });
+  const stat = (e) => { const resid = dot(e, f.u) ** 2, tot = dot(e, e); return mode === 'res' ? resid : mode === 'abs' ? tot - resid : tot; };
+  const zs = HIST.map(stat);
   const nb = mode === 'res' ? 24 : 30, bw = zmax / nb, bins = new Array(nb).fill(0);
   zs.forEach((z) => { const b = Math.floor(z / bw); if (b < nb) bins[b]++; });
   bins.forEach((n, b) => {
@@ -331,118 +74,27 @@ function drawHist(f) {
   for (let z = zmax / 400; z <= zmax; z += zmax / 400) { const d = Math.min(chiPdf(k, z), ymax); path += (path ? 'L' : 'M') + px(z).toFixed(1) + ' ' + py(d).toFixed(1); }
   mk('path', { d: path, fill: 'none', stroke: col.fit, 'stroke-width': 2 });
   mk('line', { x1: HM.l, x2: HW - HM.r, y1: py(0), y2: py(0), stroke: col.muted });
-  for (let z = 0; z <= zmax; z += mode === 'res' ? 2 : 2) { mk('text', { x: px(z), y: HH - 8, 'text-anchor': 'middle', fill: col.muted, 'font-size': 10 }).textContent = z; }
+  for (let z = 0; z <= zmax; z += 2) mk('text', { x: px(z), y: HH - 8, 'text-anchor': 'middle', fill: col.muted, 'font-size': 10 }).textContent = z;
   mk('text', { x: HW - HM.r, y: HM.t + 8, 'text-anchor': 'end', fill: col.fit, 'font-size': 11, 'font-weight': 600 }).textContent = `χ² with ${k} df`;
-  // current dataset
-  const e = scale(sub(state.y, modelC(state)), 1 / state.sigma);
-  const resid = dot(e, f.u) ** 2, tot = dot(e, e);
-  const z = mode === 'res' ? resid : mode === 'abs' ? tot - resid : tot;
-  const zc = Math.min(z, zmax);
+  const zc = Math.min(stat(scale(sub(state.y, modelC(state)), 1 / state.sigma)), zmax);
   mk('line', { x1: px(zc), x2: px(zc), y1: HM.t, y2: py(0), stroke: col.data, 'stroke-width': 2.5 });
   mk('circle', { cx: px(zc), cy: py(0), r: 4, fill: col.data });
 }
 
-/* ----------------------------------------------------------------- update */
-let lastX = '';
-function update() {
-  const { x, y, a, b, sigma, center } = state;
-  const f = solve(x, y);
-  const xb = xbasis(x, center);
-  const c = modelC(state);
-  const { yhat, r, e1, e2, u } = f;
-
-  // sliders
-  modelHead.textContent = center ? 'Your model  y = a + b·(x − x̄)' : 'Your model  y = a + b·x';
-  sliderEls.forEach(({ d, input, out }) => { const v = getVal(d); input.value = v; out.textContent = fmt(v, d.step < 0.1 ? 2 : 1); });
-
-  // lattice/plane depend only on x
-  const xk = x.join(',') + (center ? 'c' : '');
-  if (xk !== lastX) {
-    lastX = xk; buildLattice(xb);
-    if (!f.degenerate) {
-      const m = new THREE.Matrix4().makeBasis(T(e1), T(e2), T(u));
-      plane.matrix.copy(m); rim.matrix.copy(m);
-    }
-  }
-  plane.visible = rim.visible = lattice.visible = !f.degenerate;
-
-  // 3-D objects
-  arrOne.set([0, 0, 0], ONES); arrX.set([0, 0, 0], xb);
-  lblOne.at(ONES); lblX.at(xb, center ? '<b>x − x̄</b>' : '<b>x</b>');
-  const aOne = scale(ONES, a);
-  legA.set([0, 0, 0], aOne); legB.set(aOne, c);
-  ballC.position.copy(T(c));
-  lblC.at(c, center ? '<b>c</b> = a·1 + b·(x − x̄)' : '<b>c</b> = a·1 + b·x'); lblA.at(scale(aOne, 0.5)); lblBx.at(add(aOne, scale(xb, b * 0.5)), center ? 'b·(x − x̄)' : 'b·x');
-  lblA.el.style.display = norm(aOne) > 0.6 ? '' : 'none';
-  lblBx.el.style.display = norm(scale(xb, b)) > 0.6 ? '' : 'none';
-  // right angle between the two legs, only when 1 ⟂ basis vector (centred)
-  const showRA3 = center && !f.degenerate && norm(aOne) > 0.6 && norm(scale(xb, b)) > 0.6;
-  ra3.visible = showRA3;
-  if (showRA3) {
-    const s = 0.35, d1 = scale(unit(ONES), -Math.sign(a)), d2 = scale(unit(xb), Math.sign(b));
-    ra3.set([add(aOne, scale(d1, s)), add(aOne, scale(add(d1, d2), s)), add(aOne, scale(d2, s))]);
-  }
-
-  ballY.position.copy(T(y)); lblY.at(y);
-  ballH.position.copy(T(yhat)); lblH.at(yhat);
-  tubeR.set(yhat, y); lblR.at(add(yhat, scale(r, 0.5)));
-  dashYtoC.set(c, y); lblE.at(add(c, scale(sub(y, c), 0.5)));
-  dashCtoH.set(c, yhat);
-  const hasU = !f.degenerate;
-  dashLine.visible = arrU.visible = lblU.show = hasU;
-  if (hasU) {
-    dashLine.set(add(yhat, scale(u, -4)), add(yhat, scale(u, 4)));
-    arrU.set([0, 0, 0], scale(u, 2.6)); lblU.at(scale(u, 2.7));
-  }
-  const rl = norm(r);
-  const showRA = hasU && rl > 0.15;
-  ra1.visible = ra2.visible = showRA;
-  if (showRA) {
-    const s = 0.35, rh = scale(r, 1 / rl);
-    ra1.set([add(yhat, scale(e1, s)), add(yhat, scale(add(e1, rh), s)), add(yhat, scale(rh, s))]);
-    ra2.set([add(yhat, scale(e2, s)), add(yhat, scale(add(e2, rh), s)), add(yhat, scale(rh, s))]);
-  }
-  lblR.show = rl > 0.15; lblE.show = norm(sub(y, c)) > 0.4;
-  lblZero.show = false;
-
-  // noise cloud around c
-  cloud.visible = document.getElementById('cloud').checked;
-  const pos = cloudGeo.attributes.position;
-  const cc = document.getElementById('ccenter').value === 'fit' ? yhat : c;
-  for (let i = 0; i < N_CLOUD; i++) pos.setXYZ(i, cc[0] + sigma * eps[i][0], cc[1] + sigma * eps[i][1], cc[2] + sigma * eps[i][2]);
-  pos.needsUpdate = true;
-
-  drawScatter(f);
-  drawReadout(f, c);
-  drawHist(f);
-}
-
-function drawScatter(f) {
-  const { x, y } = state;
-  const { a, b } = rawLine(state);
-  const line = (el_, A, B) => { el_.setAttribute('x1', sx(XR[0])); el_.setAttribute('x2', sx(XR[1])); el_.setAttribute('y1', sy(A + B * XR[0])); el_.setAttribute('y2', sy(A + B * XR[1])); };
-  line(sCand, a, b); line(sFit, f.a, f.b);
-  for (let i = 0; i < 3; i++) {
-    const px = sx(x[i]);
-    sRes[i].setAttribute('x1', px); sRes[i].setAttribute('x2', px);
-    sRes[i].setAttribute('y1', sy(f.a + f.b * x[i])); sRes[i].setAttribute('y2', sy(y[i]));
-    sPts[i].g.setAttribute('transform', `translate(${px},${sy(y[i])})`);
-  }
-}
-
-function drawReadout(f, c) {
+/* ------------------------------------------------------------- readout */
+function drawReadout(f) {
   const { x, y, sigma, center } = state;
-  const xb = xbasis(x, center), xs = center ? '(x − x̄)' : 'x';
-  const { r, u, yhat } = f;
-  const host = document.getElementById('readout');
+  const xb = xbasis(state), xs = center ? '(x − x̄)' : 'x';
+  const host = $('readout');
   if (f.degenerate) {
     host.innerHTML = '<div class="warn">All x values are equal, so 1 and x point the same way: the "plane" collapses to a line and the model has only p = 1 free parameter. Spread the x values out to see the plane.</div>';
     return;
   }
-  const ru = dot(r, u);
+  const { r, u, yhat } = f;
+  const c = modelC(state);
   const e = scale(sub(y, c), 1 / sigma);
   const tot = dot(e, e), resid = dot(e, u) ** 2, absorbed = tot - resid;
-  const cosT = dot(ONES, xb) / (Math.sqrt(3) * norm(xb)), ang = Math.acos(clamp(cosT, -1, 1)) * 180 / Math.PI;
+  const cosT = dot(ONES, xb) / (Math.sqrt(3) * Math.hypot(...xb)), ang = Math.acos(clamp(cosT, -1, 1)) * 180 / Math.PI;
   const kv = (k, v) => `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
   host.innerHTML =
     kv('angle between 1 and ' + (center ? 'x − x̄' : 'x'), `${fmt(ang, 1)}°  ${Math.abs(ang - 90) < 0.05 ? '(perpendicular)' : '(oblique: cos θ = ' + fmt(cosT, 3) + ')'}`) +
@@ -450,32 +102,18 @@ function drawReadout(f, c) {
     kv(`fitted vector ŷ = â·1 + b̂·${xs}`, vfmt(yhat)) +
     kv('residual vector r = y − ŷ', vfmt(r)) +
     kv('perpendicular to both spanning vectors', `r·1 = ${fmt(dot(r, ONES))}  (residuals sum to 0)<br>r·${xs} = ${fmt(dot(r, xb))}  (uncorrelated with x)`) +
-    kv('the single free residual direction', `u = ${vfmt(scale(u, 1))}<br>r = (r·u)·u with r·u = ${fmt(ru)}<br>‖r‖² = RSS = ${fmt(dot(r, r))} = (r·u)²`) +
+    kv('the single free residual direction', `u = ${vfmt(u)}<br>r = (r·u)·u with r·u = ${fmt(dot(r, u))}<br>‖r‖² = RSS = ${fmt(dot(r, r))} = (r·u)²`) +
     kv(`treat c as the truth, ε = y − c  (σ = ${fmt(sigma)})`, `‖ε‖²/σ² = ${fmt(tot)} = <b style="color:${col.fit}">${fmt(absorbed)}</b> absorbed (2 df) + <b style="color:${col.resid}">${fmt(resid)}</b> left over (1 df)`) +
     kv('RSS / σ², df = n − p = 1', `${fmt(resid)}   ~ χ²₁ if the model is right`) +
     kv('estimated vs true noise', `σ̂² = RSS/(n − p) = ${fmt(dot(r, r))}<br>true σ² = ${fmt(sigma * sigma)}`);
 }
 
-/* ------------------------------------------------------------ frame loop */
-function resize() {
-  const w = view.clientWidth, h = view.clientHeight;
-  renderer.setSize(w, h, false);
-  camera.aspect = w / h; camera.updateProjectionMatrix();
+/* -------------------------------------------------------------- render */
+function renderAll() {
+  const f = solve(state.x, state.y);
+  modelHead.textContent = state.center ? 'Your model  y = a + b·(x − x̄)' : 'Your model  y = a + b·x';
+  refreshX(); refreshY(); refreshAB(); refreshSigma();
+  scatter(); model(); drawReadout(f); drawHist(f);
 }
-addEventListener('resize', resize);
-const tmp = new THREE.Vector3();
-function frame() {
-  controls.update();
-  renderer.render(scene, camera);
-  const w = view.clientWidth, h = view.clientHeight;
-  for (const L of labels) {
-    tmp.copy(L.pos).project(camera);
-    const vis = L.show && tmp.z < 1 && L.el.style.display !== 'none';
-    L.el.style.visibility = vis ? 'visible' : 'hidden';
-    if (vis) L.el.style.transform = `translate(${(tmp.x * 0.5 + 0.5) * w + 8}px, ${(-tmp.y * 0.5 + 0.5) * h}px) translateY(-50%)`;
-  }
-  requestAnimationFrame(frame);
-}
-resize();
-update();
-requestAnimationFrame(frame);
+state.on(renderAll);
+renderAll();

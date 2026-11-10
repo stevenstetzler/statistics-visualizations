@@ -76,6 +76,7 @@ export function setCenter(s, on) {
   if (on !== s.center) { s.a = clamp(s.a + (on ? 1 : -1) * s.b * xbar(s.x), -8, 8); s.center = on; }
 }
 
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => location.reload());
 export function colors() {
   const css = getComputedStyle(document.documentElement);
   const C = (n) => css.getPropertyValue(n).trim();
@@ -210,7 +211,8 @@ export function covHTML(state) {
 /* --------------------------------------------------------- 3-D model view */
 export function createModelView(container, state, opts = {}) {
   const col = colors();
-  const { cloud = false, minimal = false, camera: camPos = [15, 4, 8] } = opts;
+  const { cloud = false, fits = cloud, epsilon = false, minimal = false, camera: camPos = [15, 4, 8] } = opts;
+  const cloudLabels = minimal;
   const labelHost = document.createElement('div'); labelHost.className = 'labels';
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -260,6 +262,11 @@ export function createModelView(container, state, opts = {}) {
     const tip = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.35, 12), new THREE.MeshBasicMaterial({ color: col.muted }));
     tip.position.copy(T(scale(d, R_AX))); tip.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), T(d)); scene.add(tip);
     label(`${name} <span style="opacity:.6;font-weight:400">(obs ${i + 1})</span>`, col.muted).at(scale(d, R_AX + 0.5));
+    for (let t = -5; t <= 5; t++) {
+      if (t === 0) continue;
+      const p = scale(d, t), h = i === 1 ? [0.08, 0, 0] : [0, 0.08, 0];
+      scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([T(add(p, h)), T(sub(p, h))]), new THREE.LineBasicMaterial({ color: col.muted, transparent: true, opacity: 0.5 })));
+    }
   });
   scene.add(new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 8), new THREE.MeshBasicMaterial({ color: col.ink })));
 
@@ -289,6 +296,7 @@ export function createModelView(container, state, opts = {}) {
   const arrU = arrow(col.u, 0.35, 0.18), lblU = label('<b>u</b> residual space', col.u);
   const ra1 = polyline(col.resid, 3), ra2 = polyline(col.resid, 3), ra3 = polyline(col.cand, 3);
   const dashLine = dashed(col.resid, 0.35, 0.2);
+  const dashYtoC = dashed(col.cand), dashCtoH = dashed(col.cand, 0.1, 0.1), lblE = label('ε', col.cand); // ε = y − c and its absorbed part
 
   /* noise cloud (+ its projections onto the plane = the fits) */
   const mkPoints = (color, size, opacity) => {
@@ -327,11 +335,14 @@ export function createModelView(container, state, opts = {}) {
     ra1.visible = ra2.visible = showRA;
     if (showRA) { const s = 0.35, rh = scale(r, 1 / rl); ra1.set([add(yhat, scale(e1, s)), add(yhat, scale(add(e1, rh), s)), add(yhat, scale(rh, s))]); ra2.set([add(yhat, scale(e2, s)), add(yhat, scale(add(e2, rh), s)), add(yhat, scale(rh, s))]); }
     lblR.show = rl > 0.15 && !minimal;
+    dashYtoC.visible = dashCtoH.visible = lblE.show = epsilon;
+    if (epsilon) { dashYtoC.set(c, y); lblE.at(add(c, scale(sub(y, c), 0.5))); lblE.show = norm(sub(y, c)) > 0.4; dashCtoH.set(c, yhat); }
     if (minimal) [lblOne, lblX, lblA, lblBx, lblC].forEach((L) => { L.show = false; });
 
-    cloudPts.visible = fitPts.visible = cloud && !f.degenerate;
-    lblCloud.show = lblFits.show = cloud && !f.degenerate;
-    if (cloud && !f.degenerate) {
+    const showCl = cloud && state.showCloud !== false && !f.degenerate;
+    cloudPts.visible = showCl; fitPts.visible = showCl && fits;
+    lblCloud.show = showCl && cloudLabels; lblFits.show = showCl && fits && cloudLabels;
+    if (showCl) {
       const cc = cloudCenter(state), p1 = cloudPts.geometry.attributes.position, p2 = fitPts.geometry.attributes.position;
       for (let i = 0; i < N_CLOUD; i++) {
         const e = scale(EPS[i], state.sigma), inplane = add(scale(e1, dot(e, e1)), scale(e2, dot(e, e2)));
