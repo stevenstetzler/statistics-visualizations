@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Degrees of Freedom Tutorial</title>
+<style>
+:root{
+  --bg:#f6f7f9; --panel:#ffffff; --ink:#1c2230; --muted:#5b6475; --line:#dde1e8;
+  --data:#e8590c; --fit:#1971c2; --resid:#e03131; --res-u:#2f9e44; --cand:#7048e8; --basis:#6b7280;
+  --stage:#fbfbfd;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#12151b; --panel:#1a1f28; --ink:#e7eaf0; --muted:#98a2b3; --line:#2b3240;
+    --data:#ff922b; --fit:#4dabf7; --resid:#ff6b6b; --res-u:#69db7c; --cand:#9775fa; --basis:#9aa3b2; --stage:#0e1117; }
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+#app{display:grid;grid-template-columns:1fr 380px;height:100vh}
+#stage{position:relative;overflow:hidden;background:var(--stage)}
+#view,#view canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;left:0;top:0;white-space:nowrap;font:600 12px/1 system-ui,sans-serif;transform:translate(8px,-50%);
+  text-shadow:0 0 3px var(--stage),0 0 3px var(--stage),0 0 3px var(--stage)}
+#legend{position:absolute;left:12px;top:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);
+  border-radius:8px;padding:8px 10px;font-size:12px;display:grid;gap:3px}
+.lg{display:flex;align-items:center;gap:7px}
+.lg i,.sw{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none}
+.sw{border-radius:2px;margin:0 3px 0 6px;vertical-align:-1px}
+#hint{position:absolute;left:12px;bottom:10px;color:var(--muted);font-size:12px}
+#side{overflow-y:auto;background:var(--panel);border-left:1px solid var(--line);padding:16px 18px 28px}
+h1{font-size:18px;margin:0 0 6px}
+h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+section{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.lede{color:var(--muted);margin:0}
+.small{color:var(--muted);font-size:12px;margin:6px 0 0}
+code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+svg{width:100%;height:auto;display:block;background:var(--bg);border-radius:8px;border:1px solid var(--line);touch-action:none}
+.sl{display:grid;grid-template-columns:34px 1fr 46px;align-items:center;gap:8px;margin:3px 0}
+.sl label{font-family:ui-monospace,monospace;font-size:12.5px}
+.sl output{font-family:ui-monospace,monospace;font-size:12.5px;text-align:right}
+.sl input{width:100%;accent-color:var(--fit)}
+.sl.grp{margin-top:10px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+button,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 10px;cursor:pointer}
+button:hover{border-color:var(--fit)}
+.chk{display:flex;align-items:center;gap:5px;cursor:pointer}
+#readout{display:grid;gap:6px}
+.kv{display:grid;grid-template-columns:1fr;gap:1px;padding:6px 8px;border-radius:6px;background:var(--bg)}
+.kv .k{color:var(--muted);font-size:12px}
+.kv .v{font-family:ui-monospace,monospace;font-size:12.5px}
+.warn{color:var(--resid);font-size:12px}
+@media (max-width:900px){
+  #app{grid-template-columns:1fr;grid-template-rows:60vh auto;height:auto}
+  #stage{height:60vh}
+  #side{border-left:0;border-top:1px solid var(--line)}
+  #legend{display:none}
+}
+
+/* tutorial page */
+body.tut{height:auto}
+.tut main{max-width:1120px;margin:0 auto;padding:28px 20px 80px}
+.tut nav.top{display:flex;gap:16px;font-size:13px;color:var(--muted);margin-bottom:6px}
+.tut a{color:var(--fit)}
+.tut h1{font-size:30px;margin:36px 0 8px;letter-spacing:-.01em}
+.tut h2{font-size:21px;text-transform:none;letter-spacing:0;color:var(--ink);margin:40px 0 8px}
+.tut h1:first-of-type{margin-top:10px}
+.tut p,.tut li{max-width:70ch;font-size:15.5px}
+.tut p.lead{font-size:17px;color:var(--muted)}
+.eq{margin:12px 0;padding:10px 14px;background:var(--panel);border:1px solid var(--line);border-radius:8px;font:16px/1.7 "Cambria Math","STIX Two Math",Georgia,serif;overflow-x:auto;max-width:max-content}
+.eq .c{color:var(--muted);font:12px system-ui,sans-serif;margin-left:14px}
+.callout{border-left:3px solid var(--cand);background:var(--panel);padding:8px 14px;border-radius:0 8px 8px 0;max-width:70ch;margin:14px 0}
+.callout p{margin:4px 0}
+.cols{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:20px;align-items:start;margin:14px 0}
+.cols.wide{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.card h3{margin:0 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.view3d{position:relative;height:440px;background:var(--stage);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.view3d canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.view3d .labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.view3d .tag{position:absolute;left:10px;bottom:8px;color:var(--muted);font-size:12px}
+table.data{border-collapse:collapse;font:13px ui-monospace,monospace;margin:8px 0}
+table.data th,table.data td{padding:3px 12px;text-align:right;border-bottom:1px solid var(--line)}
+table.data th{color:var(--muted);font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0;background:var(--panel)}
+.seg button.on{background:var(--cand);color:#fff}
+.toolbar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:12px 0}
+.toolbar .lab{font-size:13px;color:var(--muted)}
+.stack{display:grid;gap:10px}
+@media (max-width:900px){.cols,.cols.wide{grid-template-columns:1fr}.view3d{height:360px}}
+
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/" } }
+</script>
+</head>
+<body class="tut">
+<main>
+<nav class="top"><span>Statistics visualizations</span> · <a href="index.html">open the full explorer →</a></nav>
+
+<h1>Introduction</h1>
+<p class="lead">Fit a line to three points and something quietly strange happens: the three numbers you measured are <em>not</em> three independent pieces of information once you have estimated a slope and an intercept. This page builds the picture that explains why, and what it does to the uncertainty of your fit.</p>
+<p>We will look at one tiny problem in two ways:</p>
+<ul>
+  <li><b>The traditional view</b>: three dots in the <i>x–y</i> plane and a line through them.</li>
+  <li><b>The model view</b>: the three <i>y</i> values stacked into a single point in ℝ³. A line <code>y = a + b·x</code> can only reach a flat 2-D plane inside that space. Least squares drops a perpendicular onto the plane, and the leftover (the residual) lives in the one remaining direction: <b>n − p = 3 − 2 = 1 degree of freedom</b>.</li>
+</ul>
+<p>Then we add noise. Noise in <i>y</i> is a cloud in ℝ³; fitting flattens it onto the plane; and the flattened cloud, read in the coordinates (a, b), <em>is</em> the uncertainty of the parameters.</p>
+
+<h1>The Setup</h1>
+<p>We observe three pairs (xᵢ, yᵢ) and assume the data were generated by a straight line plus independent Gaussian noise:</p>
+<div class="eq">yᵢ = a + b·xᵢ + εᵢ,&nbsp;&nbsp; εᵢ ~ N(0, σ²), &nbsp; i = 1, 2, 3</div>
+<p>Stack the three equations into vectors. Each observation gets its own axis, so <b>y</b> is a single point in ℝ³:</p>
+<div class="eq"><b>y</b> = a·<b>1</b> + b·<b>x</b> + <b>ε</b> = X θ + <b>ε</b>, &nbsp; X = [ <b>1</b> &nbsp;<b>x</b> ], &nbsp; θ = (a, b)ᵀ<span class="c">with <b>1</b> = (1, 1, 1)</span></div>
+<p>We do not know a and b, so we estimate them by least squares: choose θ̂ to make the leftover as short as possible.</p>
+<div class="eq">θ̂ = (â, b̂) = argmin ‖<b>y</b> − Xθ‖² = (XᵀX)⁻¹ Xᵀ <b>y</b><br><b>ŷ</b> = Xθ̂,&nbsp;&nbsp; <b>r</b> = <b>y</b> − <b>ŷ</b>,&nbsp;&nbsp; RSS = ‖<b>r</b>‖²</div>
+<p>Here are the current numbers (they update as you use the sliders below):</p>
+<div id="setupTable"></div>
+
+<h1>The Traditional View</h1>
+<p>This is the picture you already know. Each dot is an observation (xᵢ, yᵢ). The blue line is the least-squares fit and the red segments are the residuals rᵢ = yᵢ − ŷᵢ. Move the sliders (or drag the dots up and down) and watch the line follow.</p>
+<div class="cols">
+  <div class="card"><h3>x–y plane</h3><svg id="scatter1" role="img" aria-label="Scatter plot of three points and the least-squares line"></svg>
+    <p class="small"><span class="sw" style="background:var(--fit)"></span>least-squares line. Red: residuals.</p></div>
+  <div class="card"><h3>Predictors and observations</h3><div class="small">x values</div><div id="slX"></div><div class="small" style="margin-top:8px">y values</div><div id="slY"></div>
+    <div class="row"><button id="resetData">Reset to example</button></div>
+    <div id="ro2" class="stack" style="margin-top:10px"></div></div>
+</div>
+<div class="callout"><p>Notice what the residuals do as you move a point: they are never free. The residuals always sum to zero, and they are always uncorrelated with x. Two constraints on three residuals. That is the first hint that only one of them is "free".</p></div>
+
+<h1>The Model View</h1>
+<p>Now forget the x-axis. Give each observation its own axis, so the whole dataset is <b>one point</b> <b style="color:var(--data)">y</b> in ℝ³. Every line <code>a + b·x</code> predicts a vector <b>c</b> = a·<b>1</b> + b·<b>x</b>. As a and b vary, <b>c</b> sweeps out a <b style="color:var(--fit)">plane</b> through the origin, spanned by <b>1</b> and <b>x</b>. The faint grid on the plane is the (a, b) coordinate system.</p>
+<p>Use the sliders to pick a model <b style="color:var(--cand)">c</b>. The distance from <b>c</b> to <b>y</b> is that model's total error. The closest point on the plane is <b style="color:var(--fit)">ŷ</b>, and the segment from ŷ to y, the residual <b style="color:var(--resid)">r</b>, meets the plane at a right angle.</p>
+<div class="cols">
+  <div class="stack">
+    <div class="card"><h3>Choose a model (a, b)</h3><div id="slAB"></div>
+      <div class="row"><button id="snap">Set (a, b) to least squares</button></div></div>
+    <div class="card"><h3>Same data, new axes</h3><div class="small">The x and y values are the ones from the previous section.</div><div id="ro3" class="stack" style="margin-top:8px"></div></div>
+  </div>
+  <div class="view3d" id="view3d"><div class="tag">drag to rotate · scroll to zoom</div></div>
+</div>
+<div class="callout">
+  <p><b>Why 1 degree of freedom?</b> The plane is 2-dimensional (p = 2). Whatever is not in the plane must be perpendicular to it, and ℝ³ has only 3 − 2 = 1 perpendicular direction, the green <b>u</b>. So <b>r</b> always points along ±<b>u</b>, and the residuals carry exactly one number's worth of information.</p>
+  <p>The right angles are the normal equations: <b>r</b>·<b>1</b> = 0 (residuals sum to zero) and <b>r</b>·<b>x</b> = 0 (uncorrelated with x).</p>
+</div>
+
+<h1>The effect of noise</h1>
+<p>So far the data were fixed. But <b>y</b> is a noisy measurement: had we run the experiment again we would have gotten a different <b>y</b>. Suppose the truth is the model <b style="color:var(--cand)">c</b> and each dataset is <b>y</b> = <b>c</b> + <b>ε</b> with <b>ε</b> ~ N(0, σ²I). In ℝ³ that is a round fuzzy cloud centered on <b>c</b>.</p>
+<p>Fitting projects every point of that cloud onto the plane. Two things follow:</p>
+<ul>
+  <li>The part of <b>ε</b> <b>perpendicular</b> to the plane becomes the residual. It is one standard normal (times σ), so RSS/σ² ~ χ²₁.</li>
+  <li>The part of <b>ε</b> <b>inside</b> the plane moves the fit. Writing the fit as coordinates (â, b̂) on the plane, the flattened cloud <em>is</em> the sampling distribution of the parameters:</li>
+</ul>
+<div class="eq">(â, b̂)ᵀ = (XᵀX)⁻¹Xᵀ<b>y</b> &nbsp;⟹&nbsp; Cov(â, b̂) = (XᵀX)⁻¹Xᵀ · σ²I · X(XᵀX)⁻¹ = σ² (XᵀX)⁻¹</div>
+<p>In words: the covariance of the parameters is the covariance of <b>y</b>, pushed through the linear map that turns data into parameters. Because <b>1</b> and <b>x</b> are generally not perpendicular, the (a, b) grid on the plane is slanted, which tilts the ellipse: â and b̂ are correlated. Tick <i>center x</i> to make <b>1</b> ⟂ <b>x</b> − x̄ and the tilt disappears.</p>
+
+<div class="toolbar">
+  <span class="lab">Point cloud centered on</span>
+  <span class="seg" id="ccSeg"><button data-v="c" class="on">hypothesized truth c</button><button data-v="fit">fit ŷ (bootstrap)</button></span>
+  <label class="chk"><input type="checkbox" id="centerX"> center x</label>
+  <button id="draw">Draw a dataset from the truth</button>
+</div>
+<div class="cols wide">
+  <div class="stack">
+    <div class="card"><h3>Parameter space (a, b)</h3><svg id="paramSvg" role="img" aria-label="Scatter of fitted a and b over many simulated datasets, with covariance ellipses"></svg>
+      <p class="small">Each dot is the fit (â, b̂) of one simulated dataset from the cloud on the right. Ellipses come from the formula σ²(XᵀX)⁻¹; they match the dots.</p></div>
+    <div class="card"><h3>Truth and noise</h3><div id="slAB2"></div><div id="slSigma"></div><div id="ro4" class="stack" style="margin-top:8px"></div></div>
+  </div>
+  <div class="stack">
+    <div class="view3d" id="view3dNoise"><div class="tag">violet: possible datasets · blue: their fits on the plane</div></div>
+    <p class="small" style="margin:0">Each violet point is a possible dataset <b>y</b> = <b>c</b> + <b>ε</b>. Dropping it onto the plane gives the blue point, which is that dataset's fit. Only the in-plane part of the noise survives, which is why the blue points form a flat disc and why (â, b̂) lives in two dimensions.</p>
+  </div>
+</div>
+<div class="callout">
+  <p><b>Hypothesized truth vs fit.</b> With the cloud centered on <b>c</b>, the dots in parameter space center on the true (a, b): that is the sampling distribution of the estimator. In practice you do not know <b>c</b>, so you center on the fit <b>ŷ</b> instead and re-simulate (the parametric bootstrap). The ellipse then sits on your fitted (â, b̂) and is an estimate of your uncertainty. Try both, and try shrinking and growing σ or spreading the x values: more spread in x makes the ellipse for b̂ narrower.</p>
+</div>
+</main>
+<script type="module">
+import { createState, createScatter, createParamView, createModelView, buildSliders, xSliders, ySliders, abSliders, sigmaSlider,
+  solve, fitParams, setCenter, modelC, xbasis, xbar, covHTML, dot, sub, ONES, fmt, vfmt, clamp, gauss, add, scale, norm, colors } from './lib.js';
+
+const DEFAULT = { x: [0, 1, 2], y: [0, 3, 0], a: 2, b: -0.5, sigma: 1, center: false, cloudCenter: 'c' };
+const state = createState(DEFAULT);
+const $ = (id) => document.getElementById(id);
+const col = colors();
+const kv = (k, v) => `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+
+/* sliders */
+const refresh = [
+  buildSliders($('slX'), xSliders(), state),
+  buildSliders($('slY'), ySliders(), state),
+  buildSliders($('slAB'), abSliders(), state),
+  buildSliders($('slAB2'), abSliders(), state),
+  buildSliders($('slSigma'), [sigmaSlider()], state),
+];
+
+/* views */
+const scatter = createScatter($('scatter1'), state, { draggable: true, showFit: true });
+const model3d = createModelView($('view3d'), state, { cloud: false });
+const noise3d = createModelView($('view3dNoise'), state, { cloud: true, minimal: true, camera: [11, 6, 9] });
+const param = createParamView($('paramSvg'), state);
+
+/* buttons */
+$('resetData').onclick = () => { state.x = [...DEFAULT.x]; state.y = [...DEFAULT.y]; state.emit(); };
+$('snap').onclick = () => { const p = fitParams(state, state.y); state.a = clamp(p.a, -8, 8); state.b = clamp(p.b, -3, 3); state.emit(); };
+$('centerX').onchange = (e) => { setCenter(state, e.target.checked); state.emit(); };
+$('ccSeg').onclick = (e) => {
+  const v = e.target.dataset && e.target.dataset.v; if (!v) return;
+  state.cloudCenter = v;
+  [...$('ccSeg').children].forEach((b) => b.classList.toggle('on', b.dataset.v === v));
+  state.emit();
+};
+$('draw').onclick = () => {
+  const c = modelC(state);
+  state.y = add(c, scale([gauss(), gauss(), gauss()], state.sigma)).map((v) => clamp(Math.round(v * 20) / 20, -5.5, 5.5));
+  state.emit();
+};
+
+/* text readouts */
+function setupTable() {
+  const f = solve(state.x, state.y);
+  let h = '<table class="data"><tr><th>i</th><th>xᵢ</th><th>yᵢ</th><th>ŷᵢ = â + b̂·xᵢ</th><th>rᵢ = yᵢ − ŷᵢ</th></tr>';
+  for (let i = 0; i < 3; i++) h += `<tr><td>${i + 1}</td><td>${fmt(state.x[i], 1)}</td><td>${fmt(state.y[i], 1)}</td><td>${fmt(f.yhat[i])}</td><td>${fmt(f.r[i])}</td></tr>`;
+  h += `</table><p class="small mono">â = ${fmt(f.a)}, b̂ = ${fmt(f.b)} &nbsp;·&nbsp; RSS = ${fmt(dot(f.r, f.r))}</p>`;
+  $('setupTable').innerHTML = f.degenerate ? '<p class="warn">All x values are equal: the slope cannot be estimated. Spread them out.</p>' : h;
+}
+function readouts() {
+  const f = solve(state.x, state.y), xb = xbasis(state);
+  const xs = state.center ? '(x − x̄)' : 'x';
+  $('ro2').innerHTML = f.degenerate ? '' :
+    kv('residuals r', vfmt(f.r)) +
+    kv('sum of residuals', fmt(f.r[0] + f.r[1] + f.r[2])) +
+    kv('Σ rᵢ·xᵢ', fmt(dot(f.r, state.x)));
+  if (f.degenerate) { $('ro3').innerHTML = '<div class="warn">All x equal: 1 and x point the same way, so the plane collapses.</div>'; $('ro4').innerHTML = covHTML(state); return; }
+  const c = modelC(state), ru = dot(f.r, f.u);
+  const dist2 = dot(sub(state.y, c), sub(state.y, c));
+  $('ro3').innerHTML =
+    kv('fit ŷ', vfmt(f.yhat)) +
+    kv('residual r', `${vfmt(f.r)}<br>r·1 = ${fmt(dot(f.r, ONES))}, r·${xs} = ${fmt(dot(f.r, xb))}`) +
+    kv('RSS = ‖r‖² = (r·u)²', `${fmt(dot(f.r, f.r))} (r·u = ${fmt(ru)})`) +
+    kv('your model c: ‖y − c‖²', `${fmt(dist2)} ≥ RSS, with equality only when c = ŷ`);
+  const p = fitParams(state, state.y);
+  $('ro4').innerHTML = covHTML(state) + kv('your dataset\'s fit (â, b̂)', `(${fmt(p.a)}, ${fmt(p.b)})`);
+}
+
+function renderAll() {
+  refresh.forEach((r) => r());
+  setupTable(); readouts();
+  scatter(); model3d(); noise3d(); param(true);
+}
+state.on(renderAll);
+renderAll();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+/* tutorial page */
+body.tut{height:auto}
+.tut main{max-width:1120px;margin:0 auto;padding:28px 20px 80px}
+.tut nav.top{display:flex;gap:16px;font-size:13px;color:var(--muted);margin-bottom:6px}
+.tut a{color:var(--fit)}
+.tut h1{font-size:30px;margin:36px 0 8px;letter-spacing:-.01em}
+.tut h2{font-size:21px;text-transform:none;letter-spacing:0;color:var(--ink);margin:40px 0 8px}
+.tut h1:first-of-type{margin-top:10px}
+.tut p,.tut li{max-width:70ch;font-size:15.5px}
+.tut p.lead{font-size:17px;color:var(--muted)}
+.eq{margin:12px 0;padding:10px 14px;background:var(--panel);border:1px solid var(--line);border-radius:8px;font:16px/1.7 "Cambria Math","STIX Two Math",Georgia,serif;overflow-x:auto;max-width:max-content}
+.eq .c{color:var(--muted);font:12px system-ui,sans-serif;margin-left:14px}
+.callout{border-left:3px solid var(--cand);background:var(--panel);padding:8px 14px;border-radius:0 8px 8px 0;max-width:70ch;margin:14px 0}
+.callout p{margin:4px 0}
+.cols{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:20px;align-items:start;margin:14px 0}
+.cols.wide{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.card h3{margin:0 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.view3d{position:relative;height:440px;background:var(--stage);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.view3d canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.view3d .labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.view3d .tag{position:absolute;left:10px;bottom:8px;color:var(--muted);font-size:12px}
+table.data{border-collapse:collapse;font:13px ui-monospace,monospace;margin:8px 0}
+table.data th,table.data td{padding:3px 12px;text-align:right;border-bottom:1px solid var(--line)}
+table.data th{color:var(--muted);font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0;background:var(--panel)}
+.seg button.on{background:var(--cand);color:#fff}
+.toolbar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:12px 0}
+.toolbar .lab{font-size:13px;color:var(--muted)}
+.stack{display:grid;gap:10px}
+@media (max-width:900px){.cols,.cols.wide{grid-template-columns:1fr}.view3d{height:360px}}

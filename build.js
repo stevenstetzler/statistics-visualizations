@@ -18,3 +18,11 @@ const html = read('src/template.html')
 
 fs.writeFileSync(path.join(root, 'docs', 'index.html'), html);
 console.log('wrote docs/index.html (' + html.length + ' bytes)');
+
+// tutorial.html: inline page script, shared lib served as docs/lib.js
+fs.copyFileSync(path.join(root, 'src/lib.js'), path.join(root, 'docs', 'lib.js'));
+const tut = read('src/tutorial.html')
+  .replace('/*__CSS__*/', () => read('src/style.css') + '\n' + read('src/tutorial.css'))
+  .replace('/*__JS__*/', () => read('src/tutorial.js').replace("from './lib.js'", "from './lib.js'"));
+fs.writeFileSync(path.join(root, 'docs', 'tutorial.html'), tut);
+console.log('wrote docs/tutorial.html (' + tut.length + ' bytes)');
