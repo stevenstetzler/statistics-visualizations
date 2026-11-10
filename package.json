@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/stevenstetzler/statistics-visualizations#readme",
   "dependencies": {
+    "katex": "^0.16.9",
     "three": "^0.160.0"
   }
 }

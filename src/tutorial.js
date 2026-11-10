@@ -1,6 +1,23 @@
 import { createState, createScatter, createParamView, createModelView, createHistView, histStats, createChiPlot, chiSf, buildSliders, xSliders, ySliders, abSliders, sigmaSlider,
   solve, fitParams, bootstrapSamples, MODES, setCenter, modelC, xbasis, xbar, covHTML, dot, sub, ONES, fmt, vfmt, clamp, gauss, add, scale, norm, colors } from './lib.js';
 
+/* math typesetting (KaTeX auto-render, vendored in vendor/katex) */
+const TEX = {
+  delimiters: [{ left: '$$', right: '$$', display: true }, { left: '\\(', right: '\\)', display: false }],
+  throwOnError: false,
+  trust: (c) => c.command === '\\htmlClass',
+  macros: {
+    '\\ycol': '\\htmlClass{m-data}{\\mathbf{y}}',
+    '\\yhcol': '\\htmlClass{m-fit}{\\hat{\\mathbf{y}}}',
+    '\\ccol': '\\htmlClass{m-cand}{\\mathbf{c}}',
+    '\\rcol': '\\htmlClass{m-resid}{\\mathbf{r}}',
+    '\\ucol': '\\htmlClass{m-u}{\\mathbf{u}}',
+  },
+};
+const typeset = (el) => { if (window.renderMathInElement) window.renderMathInElement(el, TEX); };
+/** set innerHTML and typeset any math in it */
+const setHTML = (el, html) => { el.innerHTML = html; typeset(el); };
+
 const DEFAULT = { x: [0, 1, 2], y: [1, 2.6, 3], a: 0.5, b: 1.2, sigma: 1, center: false, cloudCenter: 'c' };
 const state = createState(DEFAULT);
 const $ = (id) => document.getElementById(id);
@@ -80,17 +97,17 @@ function readouts() {
 function modeNote() {
   const mode = state.cloudCenter, S = bootstrapSamples(state);
   const stats = {
-    c: 'Centered on the true c with the true noise: this is the actual sampling distribution of (â, b̂). Both contours should hug the dots.',
-    fit: 'Centered on your fit ŷ, with Gaussian noise of standard deviation σ (the slider stands in for σ̂). The cloud has the same shape as the truth cloud, but the dots now center on your (â, b̂), not on the truth.',
-    resid: 'Each resample is ŷ plus the three residuals redrawn with replacement. The σ slider is ignored: the noise comes from the data. The residual vector always points along u (for equally spaced x it is (c, −2c, c)), so there are only a handful of different datasets, and the dots form a few clumps.',
+    c: String.raw`Centered on the true \(\mathbf c\) with the true noise: this is the actual sampling distribution of \((\hat a, \hat b)\). Both contours should hug the dots.`,
+    fit: String.raw`Centered on your fit \(\hat{\mathbf y}\), with Gaussian noise of standard deviation \(\sigma\) (the slider stands in for \(\hat\sigma\)). The cloud has the same shape as the truth cloud, but the dots now center on your \((\hat a, \hat b)\), not on the truth.`,
+    resid: String.raw`Each resample is \(\hat{\mathbf y}\) plus the three residuals redrawn with replacement. The \(\sigma\) slider is ignored: the noise comes from the data. The residual vector always points along \(\mathbf u\) (for equally spaced \(x\) it is \((c, -2c, c)\)), so there are only a handful of different datasets, and the dots form a few clumps.`,
     pairs: '',
   };
   let h = `<p><b>${MODES[mode]}.</b> ${stats[mode]}</p>`;
   if (mode === 'pairs') {
     const bad = S.filter((t) => !t.raw).length, perfect = S.filter((t) => t.raw && t.distinct === 2).length;
-    h = `<p><b>${MODES[mode]}.</b> Each resample draws 3 of your (x, y) pairs with replacement, so it has its own x and its own plane. The σ slider is ignored. Of the ${S.length} resamples drawn here: <b>${bad}</b> had all x equal (the slope is undefined, so no dot) and <b>${perfect}</b> used only two distinct points (a perfect fit, zero residual). The remaining resamples use all three points again, which just reproduces your original fit. The 3-D cloud shows only the resampled y vectors, at most 27 distinct points.</p>`;
+    h = String.raw`<p><b>${MODES[mode]}.</b> Each resample draws 3 of your \((x, y)\) pairs with replacement, so it has its own \(x\) and its own plane. The \(\sigma\) slider is ignored. Of the ${S.length} resamples drawn here: <b>${bad}</b> had all \(x\) equal (the slope is undefined, so no dot) and <b>${perfect}</b> used only two distinct points (a perfect fit, zero residual). The remaining resamples use all three points again, which just reproduces your original fit. The 3-D cloud shows only the resampled \(\mathbf y\) vectors, at most 27 distinct points.</p>`;
   }
-  $('modeNote').innerHTML = h;
+  setHTML($('modeNote'), h);
 }
 
 function histNote(st) {
@@ -99,12 +116,14 @@ function histNote(st) {
   const pct = (f) => Math.round((100 * st.zs.filter(f).length) / n);
   if (mode === 'pairs') {
     const zero = pct((z) => z < 1e-9);
-    return `<p><b>Pairs: RSS is not χ² at all.</b> Each resample is fit with its own x, and when it contains only one or two distinct points the line passes through them exactly. <b>${zero}%</b> of the resamples have RSS = 0 exactly, and the rest sit at a single value (those just reorder your original points). With three observations and two parameters there is nothing left to resample. Only the leftover (1 df) quantity is defined here, since there is no shared plane.</p>`;
+    return String.raw`<p><b>Pairs: RSS is not \(\chi^2\) at all.</b> Each resample is fit with its own \(x\), and when it contains only one or two distinct points the line passes through them exactly. <b>${zero}%</b> of the resamples have \(\mathrm{RSS} = 0\) exactly, and the rest sit at a single value (those just reorder your original points). With three observations and two parameters there is nothing left to resample. Only the leftover (1 df) quantity is defined here, since there is no shared plane.</p>`;
   }
-  if (mode === 'resid') return `<p><b>Residual bootstrap: a few spikes, not a curve.</b> Every resample is built from the same residual vector, which points along u, so the squared length along u can only take a handful of values. Scaled by σ̂² = RSS/(n − p) it is not a smooth χ²₁, even though it has the right average. The σ slider is ignored.</p>`;
-  const what = mode === 'c' ? 'The histogram follows the curve because the noise really is Gaussian with this σ and the model really is c.' : 'The center does not matter for the leftover part: u is perpendicular to the plane, so shifting the cloud within the plane leaves its distance along u unchanged. Only σ matters, and the curve is the same as for the truth.';
-  const extra = st.stat === 'tot' ? ' Total = absorbed + leftover, so the 3-df histogram is the sum of the other two.' : st.stat === 'abs' ? ' This part is what moves (â, b̂): the in-plane noise.' : '';
-  return `<p>${what}${extra} If you use the wrong σ the whole histogram scales, whatever df you use.</p>`;
+  if (mode === 'resid') return String.raw`<p><b>Residual bootstrap: a few spikes, not a curve.</b> Every resample is built from the same residual vector, which points along \(\mathbf u\), so the squared length along \(\mathbf u\) can only take a handful of values. Scaled by \(\hat\sigma^2 = \mathrm{RSS}/(n-p)\) it is not a smooth \(\chi^2_1\), even though it has the right average. The \(\sigma\) slider is ignored.</p>`;
+  const what = mode === 'c'
+    ? String.raw`The histogram follows the curve because the noise really is Gaussian with this \(\sigma\) and the model really is \(\mathbf c\).`
+    : String.raw`The center does not matter for the leftover part: \(\mathbf u\) is perpendicular to the plane, so shifting the cloud within the plane leaves its distance along \(\mathbf u\) unchanged. Only \(\sigma\) matters, and the curve is the same as for the truth.`;
+  const extra = st.stat === 'tot' ? ' Total = absorbed + leftover, so the 3-df histogram is the sum of the other two.' : st.stat === 'abs' ? ' This part is what moves \\((\\hat a, \\hat b)\\): the in-plane noise.' : '';
+  return String.raw`<p>${what}${extra} If you use the wrong \(\sigma\) the whole histogram scales, whatever df you use.</p>`;
 }
 
 /** one-line reading of a tail probability */
@@ -118,7 +137,7 @@ function reading(k, z, what) {
 }
 function fitSection() {
   const f = solve(state.x, state.y), s2 = state.sigma * state.sigma;
-  if (f.degenerate) { ['v1', 'v2', 'v3'].forEach((id) => { $(id).innerHTML = ''; }); $('verdict').innerHTML = '<p class="warn">All x values are equal, so there is no plane. Spread the x values out.</p>'; return; }
+  if (f.degenerate) { ['v1', 'v2', 'v3'].forEach((id) => { $(id).innerHTML = ''; }); setHTML($('verdict'), '<p class="warn">All x values are equal, so there is no plane. Spread the x values out.</p>'); return; }
   const c = modelC(state), tot = dot(sub(state.y, c), sub(state.y, c)), rss = dot(f.r, f.r), abs = Math.max(tot - rss, 0);
   const z1 = rss / s2, z2 = abs / s2, z3 = tot / s2;
   chi1(z1, 'RSS / σ²'); chi3(z3, '‖y − c‖² / σ²'); chi2(z2, '‖ŷ − c‖² / σ²');
@@ -126,11 +145,12 @@ function fitSection() {
   $('v3').innerHTML = reading(3, z3, 'this error');
   $('v2').innerHTML = reading(2, z2, 'this distance');
   const p1 = chiSf(1, z1), p2 = chiSf(2, z2), p3 = chiSf(3, z3);
+  const sg = fmt(state.sigma);
   let v;
-  if (p1 < 0.05) v = `<p><b>The line family does not fit.</b> Even the best line leaves RSS/σ² = ${fmt(z1)} (p = ${fmt(p1, 3)}). No choice of (a, b) will look good at σ = ${fmt(state.sigma)}: either the data are not linear, or the noise is bigger than assumed. Your own (a, b) at ${fmt(z3)} on χ²₃ (p = ${fmt(p3, 3)}) cannot do better than the best line.</p>`;
-  else if (p2 < 0.05) v = `<p><b>The line family fits, but your (a, b) is a poor choice.</b> The best line is typical (RSS/σ² = ${fmt(z1)}, p = ${fmt(p1, 3)}), but your model is ${fmt(z2)} noise-units away from it inside the plane (p = ${fmt(p2, 3)} on χ²₂). Try "Set (a, b) to least squares".</p>`;
-  else v = `<p><b>Looks like a good choice.</b> The best line is consistent with the noise (RSS/σ² = ${fmt(z1)}, p = ${fmt(p1, 3)}), and your (a, b) is within ordinary noise of it (${fmt(z2)} on χ²₂, p = ${fmt(p2, 3)}), so the data cannot tell it apart from the best fit. Overall error ${fmt(z3)} on χ²₃ (p = ${fmt(p3, 3)}).</p>`;
-  $('verdict').innerHTML = v;
+  if (p1 < 0.05) v = String.raw`<p><b>The line family does not fit.</b> Even the best line leaves \(\mathrm{RSS}/\sigma^2 = ${fmt(z1)}\) (\(p = ${fmt(p1, 3)}\)). No choice of \((a, b)\) will look good at \(\sigma = ${sg}\): either the data are not linear, or the noise is bigger than assumed. Your own \((a, b)\) at \(${fmt(z3)}\) on \(\chi^2_3\) (\(p = ${fmt(p3, 3)}\)) cannot do better than the best line.</p>`;
+  else if (p2 < 0.05) v = String.raw`<p><b>The line family fits, but your \((a, b)\) is a poor choice.</b> The best line is typical (\(\mathrm{RSS}/\sigma^2 = ${fmt(z1)}\), \(p = ${fmt(p1, 3)}\)), but your model is \(${fmt(z2)}\) noise-units away from it inside the plane (\(p = ${fmt(p2, 3)}\) on \(\chi^2_2\)). Try "Set (a, b) to least squares".</p>`;
+  else v = String.raw`<p><b>Looks like a good choice.</b> The best line is consistent with the noise (\(\mathrm{RSS}/\sigma^2 = ${fmt(z1)}\), \(p = ${fmt(p1, 3)}\)), and your \((a, b)\) is within ordinary noise of it (\(${fmt(z2)}\) on \(\chi^2_2\), \(p = ${fmt(p2, 3)}\)), so the data cannot tell it apart from the best fit. Overall error \(${fmt(z3)}\) on \(\chi^2_3\) (\(p = ${fmt(p3, 3)}\)).</p>`;
+  setHTML($('verdict'), v);
 }
 
 function renderAll() {
@@ -139,8 +159,9 @@ function renderAll() {
   scatter(); model3d(); noise3d(); param(true);
   scatter2(); fitSection();
   const st = hist(stat);
-  $('histNote').innerHTML = histNote(st);
+  setHTML($('histNote'), histNote(st));
   [...$('dfSeg').children].forEach((b) => { b.classList.toggle('on', st && b.dataset.v === st.stat); b.classList.toggle('dis', state.cloudCenter === 'pairs' && b.dataset.v !== 'res'); });
 }
 state.on(renderAll);
 renderAll();
+typeset(document.body);
