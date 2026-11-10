@@ -1,4 +1,4 @@
-import { createState, createScatter, createParamView, createModelView, createHistView, histStats, buildSliders, xSliders, ySliders, abSliders, sigmaSlider,
+import { createState, createScatter, createParamView, createModelView, createHistView, histStats, createChiPlot, chiSf, buildSliders, xSliders, ySliders, abSliders, sigmaSlider,
   solve, fitParams, bootstrapSamples, MODES, setCenter, modelC, xbasis, xbar, covHTML, dot, sub, ONES, fmt, vfmt, clamp, gauss, add, scale, norm, colors } from './lib.js';
 
 const DEFAULT = { x: [0, 1, 2], y: [0, 3, 0], a: 2, b: -0.5, sigma: 1, center: false, cloudCenter: 'c' };
@@ -14,6 +14,9 @@ const refresh = [
   buildSliders($('slAB'), abSliders(), state),
   buildSliders($('slAB2'), abSliders(), state),
   buildSliders($('slSigma'), [sigmaSlider()], state),
+  buildSliders($('slY3'), ySliders(), state),
+  buildSliders($('slAB3'), abSliders(), state),
+  buildSliders($('slSigma3'), [sigmaSlider()], state),
 ];
 
 /* views */
@@ -22,11 +25,13 @@ const model3d = createModelView($('view3d'), state, { cloud: false });
 const noise3d = createModelView($('view3dNoise'), state, { cloud: true, minimal: true, camera: [11, 6, 9] });
 const param = createParamView($('paramSvg'), state);
 const hist = createHistView($('histSvg'), state);
+const scatter2 = createScatter($('scatter2'), state, { draggable: true, showCand: true, showFit: true });
+const chi1 = createChiPlot($('chi1'), 1, col.fit), chi2 = createChiPlot($('chi2'), 2, col.ink), chi3 = createChiPlot($('chi3'), 3, col.cand);
 let stat = 'res';
 
 /* buttons */
 $('resetData').onclick = () => { state.x = [...DEFAULT.x]; state.y = [...DEFAULT.y]; state.emit(); };
-$('snap').onclick = () => { const p = fitParams(state, state.y); state.a = clamp(p.a, -8, 8); state.b = clamp(p.b, -3, 3); state.emit(); };
+$('snap').onclick = $('snap2').onclick = () => { const p = fitParams(state, state.y); state.a = clamp(p.a, -8, 8); state.b = clamp(p.b, -3, 3); state.emit(); };
 $('centerX').onchange = (e) => { setCenter(state, e.target.checked); state.emit(); };
 $('ccSeg').onclick = (e) => {
   const v = e.target.dataset && e.target.dataset.v; if (!v) return;
@@ -101,10 +106,37 @@ function histNote(st) {
   return `<p>${what}${extra} If you use the wrong σ the whole histogram scales, whatever df you use.</p>`;
 }
 
+/** one-line reading of a tail probability */
+function reading(k, z, what) {
+  const upper = chiSf(k, z), lower = 1 - upper;
+  if (upper < 0.01) return `<b style="color:var(--resid)">Far in the right tail</b>: noise this size would exceed ${what} only ${fmt(upper * 100, 1)}% of the time.`;
+  if (upper < 0.05) return `<b style="color:var(--resid)">Right tail</b>: only ${fmt(upper * 100, 1)}% of noise draws are this large.`;
+  if (lower < 0.05) return `<b>Left tail</b>: closer than ${fmt((1 - lower) * 100, 0)}% of noise draws would be.`;
+  if (upper < 0.1) return `<b>Borderline</b>: ${fmt(upper * 100, 1)}% of noise draws are at least this large.`;
+  return `<b style="color:var(--res-u)">Typical</b>: ${fmt(upper * 100, 0)}% of noise draws are at least this large.`;
+}
+function fitSection() {
+  const f = solve(state.x, state.y), s2 = state.sigma * state.sigma;
+  if (f.degenerate) { ['v1', 'v2', 'v3'].forEach((id) => { $(id).innerHTML = ''; }); $('verdict').innerHTML = '<p class="warn">All x values are equal, so there is no plane. Spread the x values out.</p>'; return; }
+  const c = modelC(state), tot = dot(sub(state.y, c), sub(state.y, c)), rss = dot(f.r, f.r), abs = Math.max(tot - rss, 0);
+  const z1 = rss / s2, z2 = abs / s2, z3 = tot / s2;
+  chi1(z1, 'RSS / σ²'); chi3(z3, '‖y − c‖² / σ²'); chi2(z2, '‖ŷ − c‖² / σ²');
+  $('v1').innerHTML = reading(1, z1, 'this RSS');
+  $('v3').innerHTML = reading(3, z3, 'this error');
+  $('v2').innerHTML = reading(2, z2, 'this distance');
+  const p1 = chiSf(1, z1), p2 = chiSf(2, z2), p3 = chiSf(3, z3);
+  let v;
+  if (p1 < 0.05) v = `<p><b>The line family does not fit.</b> Even the best line leaves RSS/σ² = ${fmt(z1)} (p = ${fmt(p1, 3)}). No choice of (a, b) will look good at σ = ${fmt(state.sigma)}: either the data are not linear, or the noise is bigger than assumed. Your own (a, b) at ${fmt(z3)} on χ²₃ (p = ${fmt(p3, 3)}) cannot do better than the best line.</p>`;
+  else if (p2 < 0.05) v = `<p><b>The line family fits, but your (a, b) is a poor choice.</b> The best line is typical (RSS/σ² = ${fmt(z1)}, p = ${fmt(p1, 3)}), but your model is ${fmt(z2)} noise-units away from it inside the plane (p = ${fmt(p2, 3)} on χ²₂). Try "Set (a, b) to least squares".</p>`;
+  else v = `<p><b>Looks like a good choice.</b> The best line is consistent with the noise (RSS/σ² = ${fmt(z1)}, p = ${fmt(p1, 3)}), and your (a, b) is within ordinary noise of it (${fmt(z2)} on χ²₂, p = ${fmt(p2, 3)}), so the data cannot tell it apart from the best fit. Overall error ${fmt(z3)} on χ²₃ (p = ${fmt(p3, 3)}).</p>`;
+  $('verdict').innerHTML = v;
+}
+
 function renderAll() {
   refresh.forEach((r) => r());
   setupTable(); readouts(); modeNote();
   scatter(); model3d(); noise3d(); param(true);
+  scatter2(); fitSection();
   const st = hist(stat);
   $('histNote').innerHTML = histNote(st);
   [...$('dfSeg').children].forEach((b) => { b.classList.toggle('on', st && b.dataset.v === st.stat); b.classList.toggle('dis', state.cloudCenter === 'pairs' && b.dataset.v !== 'res'); });

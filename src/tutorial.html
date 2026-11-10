@@ -119,6 +119,42 @@
 <div class="callout">
   <p><b>What to take away.</b> Truth and parametric clouds agree in shape, because (â, b̂) is a fixed linear map of y and only the center moves. In practice only the fit-centered ones are available, and each trades an assumption for accuracy: the parametric one assumes Gaussian noise and uses σ̂; the residual one assumes nothing about the shape but has just n − p = 1 free residual direction to resample; the pairs one assumes nothing about the model but needs many more than three observations to stop producing degenerate resamples. The residual bootstrap also slightly understates the noise, because least squares makes residuals smaller than the true errors (a common fix rescales them by √(n/(n − p))). Try shrinking σ, spreading the x values, and switching modes to see which clouds respond.</p>
 </div>
+
+<h1>Does your model fit?</h1>
+<p>Everything above asked how much a fit would wobble if the truth were known. Now turn it around: given <em>one</em> dataset, is the model a plausible explanation of it? If the line model is right and the noise is Gaussian with a known σ, then the squared lengths of the pieces of <b>y</b> have known distributions, and you can ask where yours landed:</p>
+<table class="cmp">
+<tr><th>Quantity</th><th>What it measures</th><th>If the model is right</th><th>df</th></tr>
+<tr><td><b style="color:var(--fit)">RSS/σ²</b> = ‖<b>y</b> − <b>ŷ</b>‖²/σ²</td><td>how far the data are from the <em>best</em> line</td><td>χ²₁</td><td>n − p = 3 − 2: the plane has absorbed 2 directions of noise</td></tr>
+<tr><td><b style="color:var(--cand)">‖y − c‖²/σ²</b></td><td>how far the data are from <em>your</em> (a, b)</td><td>χ²₃</td><td>n = 3: nothing was estimated, so no direction is absorbed</td></tr>
+<tr><td><b>‖ŷ − c‖²/σ²</b></td><td>how far your (a, b) is from the best line, inside the plane</td><td>χ²₂</td><td>the 2 directions the fit absorbed</td></tr>
+</table>
+<p>They are linked by Pythagoras: ‖<b>y</b> − <b>c</b>‖² = ‖<b>y</b> − <b>ŷ</b>‖² + ‖<b>ŷ</b> − <b>c</b>‖², which is the 3 = 1 + 2 split from before. Change the data or your model below and watch the markers move. The shaded area is the <b>tail probability</b>: how often noise alone would produce something at least this large.</p>
+<div class="cols">
+  <div class="stack">
+    <div class="card"><h3>Data and your model</h3><svg id="scatter2" role="img" aria-label="Scatter plot with the best-fit line and your chosen line"></svg>
+      <p class="small"><span class="sw" style="background:var(--fit)"></span>best-fit line, <span class="sw" style="background:var(--cand)"></span>your (a, b) line.</p></div>
+  </div>
+  <div class="stack">
+    <div class="card slrow3"><div id="slY3"></div><div id="slAB3"></div><div id="slSigma3"></div></div>
+    <div class="row" style="margin-top:0"><button id="snap2">Set (a, b) to least squares</button></div>
+  </div>
+</div>
+<div class="plots3">
+  <div class="card"><h3 style="color:var(--fit)">Best-fit line · χ²₁</h3><svg id="chi1" role="img" aria-label="Chi-square with 1 degree of freedom and the best-fit RSS marked"></svg><div id="v1" class="small"></div></div>
+  <div class="card"><h3 style="color:var(--cand)">Your (a, b) · χ²₃</h3><svg id="chi3" role="img" aria-label="Chi-square with 3 degrees of freedom and your model's error marked"></svg><div id="v3" class="small"></div></div>
+  <div class="card"><h3>Your (a, b) vs the best line · χ²₂</h3><svg id="chi2" role="img" aria-label="Chi-square with 2 degrees of freedom and the in-plane distance marked"></svg><div id="v2" class="small"></div></div>
+</div>
+<div id="verdict" class="callout"></div>
+<h2>How to read it</h2>
+<ul>
+  <li><b>Right tail (small p).</b> The data are farther from the model than noise of this size usually puts them. Either the model is the wrong shape (here, the points bend and a line cannot follow), or the noise is larger than the σ you assumed.</li>
+  <li><b>Left tail (p near 1).</b> The data are suspiciously close to the model, closer than noise of this size should allow. That usually means σ was overestimated, not that the fit is good. Note that for 1 df, small values are <em>normal</em>: χ²₁ piles up near zero, so RSS ≈ 0 is not suspicious at all.</li>
+  <li><b>Middle.</b> The data are consistent with the model plus noise. That is evidence of no contradiction, not proof the model is right.</li>
+</ul>
+<div class="callout">
+  <p><b>The catch: σ has to come from somewhere else.</b> If you instead estimate σ̂² = RSS/(n − p) from the same fit, then RSS/σ̂² is identically 1 and the test says nothing. With 1 degree of freedom you cannot both estimate the noise and check the fit with the same three points. You need σ from outside the data (a measurement spec, a calibration, replicates), or more observations than parameters by a good margin.</p>
+  <p><b>Try this.</b> With the starting data (0, 3, 0) and σ = 1, the best line has RSS/σ² = 6, out in the right tail of χ²₁ (p ≈ 0.014): a line is a poor description of three points that bend. Raise σ to 2 and the same data are unremarkable. Or drag y₂ toward 1 so the points line up. Meanwhile your (a, b) can be a bad choice even when the line family fits: the χ²₂ panel shows how far it sits from the best line, which is the same question as whether the point (a, b) falls inside the ellipse from Part 2 (the 95% contour is at 5.99).</p>
+</div>
 </main>
 <script type="module">
 /*__JS__*/

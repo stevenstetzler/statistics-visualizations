@@ -311,6 +311,47 @@ export function createHistView(svg, state) {
   };
 }
 
+/* ------------------------------------- χ² tail probabilities and a marker plot */
+function erfc(x) { // Numerical Recipes erfcc, relative error < 1.2e-7 (x >= 0)
+  const t = 1 / (1 + 0.5 * x);
+  return t * Math.exp(-x * x - 1.26551223 + t * (1.00002368 + t * (0.37409196 + t * (0.09678418 + t * (-0.18628806 + t * (0.27886807 + t * (-1.13520398 + t * (1.48851587 + t * (-0.82215223 + t * 0.17087277)))))))));
+}
+/** P(χ²_k >= z) for k = 1, 2, 3 */
+export function chiSf(k, z) {
+  if (z <= 0) return 1;
+  if (k === 1) return erfc(Math.sqrt(z / 2));
+  if (k === 2) return Math.exp(-z / 2);
+  return erfc(Math.sqrt(z / 2)) + Math.sqrt(2 * z / Math.PI) * Math.exp(-z / 2);
+}
+/** χ²_k density with a marker at z and the upper tail shaded */
+export function createChiPlot(svg, k, color) {
+  const col = colors();
+  const W = 320, H = 150, M = { l: 12, r: 12, t: 22, b: 30 };
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const ymax = { 1: 1.0, 2: 0.55, 3: 0.3 }[k];
+  return (z, label) => {
+    svg.innerHTML = '';
+    const mk = (tag, a) => svgEl(tag, a, svg);
+    const zmax = Math.max({ 1: 8, 2: 10, 3: 12 }[k], Math.ceil(z * 1.15));
+    const px = (v) => M.l + (v / zmax) * (W - M.l - M.r);
+    const py = (d) => H - M.b - (Math.min(d, ymax) / ymax) * (H - M.t - M.b);
+    const pts = [];
+    for (let v = zmax / 500; v <= zmax; v += zmax / 500) pts.push([v, chiPdf(k, v)]);
+    const line = (a) => a.map(([v, d], j) => (j ? 'L' : 'M') + px(v).toFixed(1) + ' ' + py(d).toFixed(1)).join('');
+    const tail = pts.filter(([v]) => v >= z);
+    if (tail.length > 1) mk('path', { d: line(tail) + `L${px(zmax)} ${py(0)}L${px(tail[0][0])} ${py(0)}Z`, fill: col.resid, 'fill-opacity': 0.28 });
+    mk('path', { d: line(pts), fill: 'none', stroke: col.muted, 'stroke-width': 2 });
+    mk('line', { x1: M.l, x2: W - M.r, y1: py(0), y2: py(0), stroke: col.muted });
+    const step = zmax > 14 ? 4 : 2;
+    for (let v = 0; v <= zmax; v += step) mk('text', { x: px(v), y: H - 16, 'text-anchor': 'middle', fill: col.muted, 'font-size': 10 }).textContent = v;
+    mk('text', { x: (M.l + W - M.r) / 2, y: H - 3, 'text-anchor': 'middle', fill: col.muted, 'font-size': 11 }).textContent = label;
+    mk('line', { x1: px(z), x2: px(z), y1: M.t - 6, y2: py(0), stroke: color, 'stroke-width': 2.5 });
+    mk('circle', { cx: px(z), cy: py(0), r: 4.5, fill: color });
+    const right = px(z) > W * 0.6;
+    mk('text', { x: px(z) + (right ? -6 : 6), y: M.t, 'text-anchor': right ? 'end' : 'start', fill: color, 'font-size': 11, 'font-weight': 700, style: 'paint-order:stroke;stroke:var(--bg);stroke-width:3px' }).textContent = `${fmt(z)}   p = ${fmt(chiSf(k, z), 3)}`;
+  };
+}
+
 /** HTML for the covariance readout */
 export function covHTML(state) {
   const cov = covAB(state);

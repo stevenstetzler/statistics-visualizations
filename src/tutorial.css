@@ -40,3 +40,7 @@ table.cmp th{color:var(--muted);font-size:12px;letter-spacing:.04em;text-transfo
 .slrow{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;margin:14px 0}
 @media (max-width:700px){.slrow{grid-template-columns:1fr}}
 .seg button.dis{opacity:.45}
+
+.slrow3{display:grid;grid-template-columns:1fr;gap:4px}
+.plots3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:14px 0}
+@media (max-width:900px){.plots3{grid-template-columns:1fr}}
