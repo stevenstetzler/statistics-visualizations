@@ -138,7 +138,7 @@ import {
   solve, fitParams, setCenter, modelC, xbasis, xbar, dot, add, sub, scale, gauss, fmt, vfmt, clamp, colors, ONES,
 } from './lib.js';
 
-const DEFAULTS = { x: [0, 1, 2], y: [0, 3, 0], a: 2, b: -0.5, sigma: 1, center: false, cloudCenter: 'c', showCloud: true };
+const DEFAULTS = { x: [0, 1, 2], y: [1, 2.6, 3], a: 0.5, b: 1.2, sigma: 1, center: false, cloudCenter: 'c', showCloud: true };
 const state = createState(DEFAULTS);
 const $ = (id) => document.getElementById(id);
 const col = colors();

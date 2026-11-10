@@ -234,7 +234,8 @@ table.cmp th{color:var(--muted);font-size:12px;letter-spacing:.04em;text-transfo
   </div>
   <div class="stack">
     <div class="card slrow3"><div id="slY3"></div><div id="slAB3"></div><div id="slSigma3"></div></div>
-    <div class="row" style="margin-top:0"><button id="snap2">Set (a, b) to least squares</button></div>
+    <div class="row" style="margin-top:0"><button id="snap2">Set (a, b) to least squares</button>
+      <button id="curved">Load curved data (0, 3, 0)</button></div>
   </div>
 </div>
 <div class="plots3">
@@ -251,14 +252,14 @@ table.cmp th{color:var(--muted);font-size:12px;letter-spacing:.04em;text-transfo
 </ul>
 <div class="callout">
   <p><b>The catch: σ has to come from somewhere else.</b> If you instead estimate σ̂² = RSS/(n − p) from the same fit, then RSS/σ̂² is identically 1 and the test says nothing. With 1 degree of freedom you cannot both estimate the noise and check the fit with the same three points. You need σ from outside the data (a measurement spec, a calibration, replicates), or more observations than parameters by a good margin.</p>
-  <p><b>Try this.</b> With the starting data (0, 3, 0) and σ = 1, the best line has RSS/σ² = 6, out in the right tail of χ²₁ (p ≈ 0.014): a line is a poor description of three points that bend. Raise σ to 2 and the same data are unremarkable. Or drag y₂ toward 1 so the points line up. Meanwhile your (a, b) can be a bad choice even when the line family fits: the χ²₂ panel shows how far it sits from the best line, which is the same question as whether the point (a, b) falls inside the ellipse from Part 2 (the 95% contour is at 5.99).</p>
+  <p><b>Try this.</b> The starting data lie close to a line, so the best line leaves a small RSS/σ² and sits comfortably in the bulk of χ²₁. Now click <i>Load curved data (0, 3, 0)</i>: with σ = 1 the best line has RSS/σ² = 6, out in the right tail (p ≈ 0.014), because a line is a poor description of three points that bend. Raise σ to 2 and the same data are unremarkable, or drag y₂ toward 1 so the points line up. Meanwhile your (a, b) can be a bad choice even when the line family fits: the χ²₂ panel shows how far it sits from the best line, which is the same question as whether the point (a, b) falls inside the ellipse from Part 2 (the 95% contour is at 5.99).</p>
 </div>
 </main>
 <script type="module">
 import { createState, createScatter, createParamView, createModelView, createHistView, histStats, createChiPlot, chiSf, buildSliders, xSliders, ySliders, abSliders, sigmaSlider,
   solve, fitParams, bootstrapSamples, MODES, setCenter, modelC, xbasis, xbar, covHTML, dot, sub, ONES, fmt, vfmt, clamp, gauss, add, scale, norm, colors } from './lib.js';
 
-const DEFAULT = { x: [0, 1, 2], y: [0, 3, 0], a: 2, b: -0.5, sigma: 1, center: false, cloudCenter: 'c' };
+const DEFAULT = { x: [0, 1, 2], y: [1, 2.6, 3], a: 0.5, b: 1.2, sigma: 1, center: false, cloudCenter: 'c' };
 const state = createState(DEFAULT);
 const $ = (id) => document.getElementById(id);
 const col = colors();
@@ -300,6 +301,7 @@ $('dfSeg').onclick = (e) => {
   const v = e.target.dataset && e.target.dataset.v; if (!v) return;
   stat = v; state.emit();
 };
+$('curved').onclick = () => { state.x = [0, 1, 2]; state.y = [0, 3, 0]; state.emit(); };
 $('draw').onclick = () => {
   const c = modelC(state);
   state.y = add(c, scale([gauss(), gauss(), gauss()], state.sigma)).map((v) => clamp(Math.round(v * 20) / 20, -5.5, 5.5));

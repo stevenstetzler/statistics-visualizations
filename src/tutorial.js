@@ -1,7 +1,7 @@
 import { createState, createScatter, createParamView, createModelView, createHistView, histStats, createChiPlot, chiSf, buildSliders, xSliders, ySliders, abSliders, sigmaSlider,
   solve, fitParams, bootstrapSamples, MODES, setCenter, modelC, xbasis, xbar, covHTML, dot, sub, ONES, fmt, vfmt, clamp, gauss, add, scale, norm, colors } from './lib.js';
 
-const DEFAULT = { x: [0, 1, 2], y: [0, 3, 0], a: 2, b: -0.5, sigma: 1, center: false, cloudCenter: 'c' };
+const DEFAULT = { x: [0, 1, 2], y: [1, 2.6, 3], a: 0.5, b: 1.2, sigma: 1, center: false, cloudCenter: 'c' };
 const state = createState(DEFAULT);
 const $ = (id) => document.getElementById(id);
 const col = colors();
@@ -43,6 +43,7 @@ $('dfSeg').onclick = (e) => {
   const v = e.target.dataset && e.target.dataset.v; if (!v) return;
   stat = v; state.emit();
 };
+$('curved').onclick = () => { state.x = [0, 1, 2]; state.y = [0, 3, 0]; state.emit(); };
 $('draw').onclick = () => {
   const c = modelC(state);
   state.y = add(c, scale([gauss(), gauss(), gauss()], state.sigma)).map((v) => clamp(Math.round(v * 20) / 20, -5.5, 5.5));
