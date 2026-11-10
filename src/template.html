@@ -59,6 +59,13 @@
         <label class="chk"><input type="checkbox" id="cloud" checked> noise cloud</label>
       </div>
       <div class="row">
+        <label for="ccenter">Center cloud on</label>
+        <select id="ccenter">
+          <option value="c">model c (hypothesized truth)</option>
+          <option value="fit">fit ŷ (parametric bootstrap)</option>
+        </select>
+      </div>
+      <div class="row">
         <label for="stat">Histogram of</label>
         <select id="stat">
           <option value="res">leftover noise ‖r‖² (1 df)</option>

@@ -254,6 +254,7 @@ function setCenter(on) {
 document.getElementById('center').onchange = (ev) => { setCenter(ev.target.checked); update(); };
 document.getElementById('cloud').onchange = () => update();
 document.getElementById('stat').onchange = () => update();
+document.getElementById('ccenter').onchange = () => update();
 document.getElementById('draw').onclick = () => {
   const e = [gauss(), gauss(), gauss()];
   const c = modelC(state);
@@ -407,7 +408,8 @@ function update() {
   // noise cloud around c
   cloud.visible = document.getElementById('cloud').checked;
   const pos = cloudGeo.attributes.position;
-  for (let i = 0; i < N_CLOUD; i++) pos.setXYZ(i, c[0] + sigma * eps[i][0], c[1] + sigma * eps[i][1], c[2] + sigma * eps[i][2]);
+  const cc = document.getElementById('ccenter').value === 'fit' ? yhat : c;
+  for (let i = 0; i < N_CLOUD; i++) pos.setXYZ(i, cc[0] + sigma * eps[i][0], cc[1] + sigma * eps[i][1], cc[2] + sigma * eps[i][2]);
   pos.needsUpdate = true;
 
   drawScatter(f);
