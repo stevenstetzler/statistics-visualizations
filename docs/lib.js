@@ -69,6 +69,9 @@ export function createState(init) {
 }
 /** fixed random picks (0..2) used by the residual and pairs bootstraps */
 export const IDX = Array.from({ length: N_CLOUD }, () => [0, 1, 2].map(() => Math.floor(rng() * 3)));
+const N_HIST = 4000;
+const EPS_H = Array.from({ length: N_HIST }, () => [gauss(), gauss(), gauss()]);
+const IDX_H = Array.from({ length: N_HIST }, () => [0, 1, 2].map(() => Math.floor(rng() * 3)));
 export const MODES = {
   c: 'hypothesized truth c',
   fit: 'parametric bootstrap (ŷ + Gaussian noise)',
@@ -236,6 +239,75 @@ export function createParamView(svg, state) {
     }
     mark(truth.a, truth.b, col.cand, 'true (a, b)', 14);
     mark(obs.a, obs.b, col.data, 'your fit (â, b̂)', -9);
+  };
+}
+
+/* ------------------------------------------------- histogram of squared lengths */
+const chiPdf = (k, z) => {
+  if (z <= 0) return 0;
+  if (k === 1) return Math.exp(-z / 2) / Math.sqrt(2 * Math.PI * z);
+  if (k === 2) return 0.5 * Math.exp(-z / 2);
+  return Math.sqrt(z) * Math.exp(-z / 2) / Math.sqrt(2 * Math.PI);
+};
+let pairsCache = { key: '', zs: null };
+/**
+ * Squared lengths for the current cloud mode (4000 samples).
+ * stat: 'res' (perpendicular part, 1 df), 'abs' (in-plane part, 2 df), 'tot' (3 df).
+ * Truth/parametric are scaled by the slider σ; the data-driven bootstraps by σ̂² = RSS/(n − p).
+ * Pairs has no single plane, so only 'res' (that resample's own RSS) is defined there.
+ */
+export function histStats(s, stat) {
+  const mode = s.cloudCenter, f = solve(s.x, s.y);
+  if (f.degenerate) return null;
+  if (mode === 'pairs') stat = 'res';
+  const known = mode === 'c' || mode === 'fit';
+  const sig2 = known ? s.sigma * s.sigma : Math.max(dot(f.r, f.r), 1e-9);
+  const part = (e) => { const res = dot(e, f.u) ** 2, tot = dot(e, e); return stat === 'res' ? res : stat === 'abs' ? tot - res : tot; };
+  let zs;
+  if (mode === 'pairs') {
+    const key = s.x.join() + '|' + s.y.join();
+    if (pairsCache.key !== key) {
+      pairsCache = { key, zs: IDX_H.map((ix) => { const g = solve(ix.map((k) => s.x[k]), ix.map((k) => s.y[k])); return dot(g.r, g.r); }) };
+    }
+    zs = pairsCache.zs.map((z) => z / sig2);
+  } else if (known) zs = EPS_H.map((e) => part(scale(e, s.sigma)) / sig2);
+  else zs = IDX_H.map((ix) => part(ix.map((k) => f.r[k])) / sig2);
+  // the current dataset, measured from the same centre (only meaningful with a known σ)
+  const marker = known ? part(sub(s.y, mode === 'c' ? modelC(s) : f.yhat)) / sig2 : null;
+  const unit_ = known ? 'σ²' : 'σ̂²', star = known ? '' : '*';
+  const label = { res: `‖r${star}‖² / ${unit_}`, abs: `in-plane noise ‖Pε${star}‖² / ${unit_}`, tot: `‖ε${star}‖² / ${unit_}` }[stat];
+  return { zs, marker, stat, k: { res: 1, abs: 2, tot: 3 }[stat], label, mode };
+}
+/** histogram of histStats against the χ² density */
+export function createHistView(svg, state) {
+  const col = colors();
+  const W = 320, H = 170, M = { l: 30, r: 10, t: 10, b: 36 };
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  return (stat) => {
+    svg.innerHTML = '';
+    const mk = (tag, a) => svgEl(tag, a, svg);
+    const st = histStats(state, stat);
+    if (!st) { mk('text', { x: 160, y: 85, 'text-anchor': 'middle', fill: col.muted, 'font-size': 12 }).textContent = 'plane is degenerate (all x equal)'; return null; }
+    const { zs, marker, k, label } = st;
+    const zmax = { 1: 6, 2: 10, 3: 12 }[k], ymax = { 1: 1.0, 2: 0.6, 3: 0.3 }[k];
+    const px = (z) => M.l + (z / zmax) * (W - M.l - M.r);
+    const py = (d) => H - M.b - (d / ymax) * (H - M.t - M.b);
+    const nb = k === 1 ? 24 : 30, bw = zmax / nb, bins = new Array(nb).fill(0);
+    zs.forEach((z) => { const b = Math.floor(z / bw); if (b >= 0 && b < nb) bins[b]++; });
+    bins.forEach((n, b) => { const d = Math.min(n / (zs.length * bw), ymax); mk('rect', { x: px(b * bw) + 0.5, y: py(d), width: Math.max(0, px(bw) - px(0) - 1), height: py(0) - py(d), fill: col.cand, 'fill-opacity': 0.35 }); });
+    let path = '';
+    for (let z = zmax / 400; z <= zmax; z += zmax / 400) path += (path ? 'L' : 'M') + px(z).toFixed(1) + ' ' + py(Math.min(chiPdf(k, z), ymax)).toFixed(1);
+    mk('path', { d: path, fill: 'none', stroke: col.fit, 'stroke-width': 2 });
+    mk('line', { x1: M.l, x2: W - M.r, y1: py(0), y2: py(0), stroke: col.muted });
+    for (let z = 0; z <= zmax; z += 2) mk('text', { x: px(z), y: H - 22, 'text-anchor': 'middle', fill: col.muted, 'font-size': 10 }).textContent = z;
+    mk('text', { x: (M.l + W - M.r) / 2, y: H - 6, 'text-anchor': 'middle', fill: col.muted, 'font-size': 11 }).textContent = label;
+    mk('text', { x: W - M.r, y: M.t + 8, 'text-anchor': 'end', fill: col.fit, 'font-size': 11, 'font-weight': 600 }).textContent = `χ² with ${k} df`;
+    if (marker !== null) {
+      const zc = Math.min(marker, zmax);
+      mk('line', { x1: px(zc), x2: px(zc), y1: M.t, y2: py(0), stroke: col.data, 'stroke-width': 2.5 });
+      mk('circle', { cx: px(zc), cy: py(0), r: 4, fill: col.data });
+    }
+    return st;
   };
 }
 

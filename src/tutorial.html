@@ -63,16 +63,14 @@
 
 <h1>The effect of noise</h1>
 <p>So far the data were fixed. But <b>y</b> is a noisy measurement: had we run the experiment again we would have gotten a different <b>y</b>. Suppose the truth is the model <b style="color:var(--cand)">c</b> and each dataset is <b>y</b> = <b>c</b> + <b>ε</b> with <b>ε</b> ~ N(0, σ²I). In ℝ³ that is a round fuzzy cloud centered on <b>c</b>.</p>
-<p>Fitting projects every point of that cloud onto the plane. Two things follow:</p>
+<p>Fitting projects every point of that cloud onto the plane, which splits the noise into two perpendicular pieces. Each piece has its own consequence:</p>
 <ul>
-  <li>The part of <b>ε</b> <b>perpendicular</b> to the plane becomes the residual. It is one standard normal (times σ), so RSS/σ² ~ χ²₁.</li>
-  <li>The part of <b>ε</b> <b>inside</b> the plane moves the fit. Writing the fit as coordinates (â, b̂) on the plane, the flattened cloud <em>is</em> the sampling distribution of the parameters:</li>
+  <li>The part of <b>ε</b> <b>perpendicular</b> to the plane becomes the residual. It is a single coordinate along <b>u</b>, so RSS/σ² is one squared standard normal: <b>χ²₁</b>.</li>
+  <li>The part of <b>ε</b> <b>inside</b> the plane moves the fit. Read in the (a, b) coordinates of the plane, the flattened cloud <em>is</em> the sampling distribution of the parameters: <b>Cov(â, b̂) = σ²(XᵀX)⁻¹</b>.</li>
 </ul>
-<div class="eq">(â, b̂)ᵀ = (XᵀX)⁻¹Xᵀ<b>y</b> &nbsp;⟹&nbsp; Cov(â, b̂) = (XᵀX)⁻¹Xᵀ · σ²I · X(XᵀX)⁻¹ = σ² (XᵀX)⁻¹</div>
-<p>In words: the covariance of the parameters is the covariance of <b>y</b>, pushed through the linear map that turns data into parameters. Because <b>1</b> and <b>x</b> are generally not perpendicular, the (a, b) grid on the plane is slanted, which tilts the ellipse: â and b̂ are correlated. Tick <i>center x</i> to make <b>1</b> ⟂ <b>x</b> − x̄ and the tilt disappears.</p>
 
 <h2>Where should the cloud come from?</h2>
-<p>The orange dataset is a single draw. To say how much the fit would wobble from draw to draw we need many datasets, and there are four standard ways to get them. They differ in <b>where they are centered</b> and <b>where the noise comes from</b>.</p>
+<p>The orange dataset is a single draw. To say how much the fit would wobble from draw to draw we need many datasets, and there are four standard ways to get them. They differ in <b>where they are centered</b> and <b>where the noise comes from</b>. Pick one below; both analyses that follow use it.</p>
 <table class="cmp">
 <tr><th>Cloud</th><th>Centered on</th><th>Noise comes from</th><th>Needs</th><th>With n = 3</th></tr>
 <tr><td><b>Truth c</b><br><span class="small">the sampling distribution</span></td><td>the true c = a·1 + b·x</td><td>the true N(0, σ²)</td><td>c and σ, known. Only possible in a simulation like this one.</td><td>Exact. Ellipse = σ²(XᵀX)⁻¹.</td></tr>
@@ -89,16 +87,33 @@
   <button id="draw">Draw a dataset from the truth</button>
 </div>
 <div id="modeNote" class="callout" style="margin-top:0"></div>
+<div class="card slrow"><div id="slAB2"></div><div id="slSigma"></div></div>
+
+<h2>Part 1: the perpendicular piece, and χ²</h2>
+<p>The residual space is one-dimensional, so the leftover noise has exactly one coordinate, ε·<b>u</b>, which is N(0, σ²). Squared and divided by σ², that is one standard normal squared, a <b>χ² with 1 degree of freedom</b>. This is the mechanism behind "df = n − p": each fitted parameter removes a direction that the leftover noise could have pointed along.</p>
+<p>The histogram below measures that squared length for 4000 datasets from the chosen cloud, against the χ² curve. Switch the quantity to see that the pieces add up: <b>3 = 2 + 1</b>, the dimension of the plane plus the dimension left over.</p>
 <div class="cols wide">
   <div class="stack">
-    <div class="card"><h3>Parameter space (a, b)</h3><svg id="paramSvg" role="img" aria-label="Scatter of fitted a and b over many simulated datasets, with covariance ellipses"></svg>
-      <p class="small">Each dot is the fit (â, b̂) of one simulated dataset from the cloud on the right. Ellipses come from the formula σ²(XᵀX)⁻¹; they match the dots.</p></div>
-    <div class="card"><h3>Truth and noise</h3><div id="slAB2"></div><div id="slSigma"></div><div id="ro4" class="stack" style="margin-top:8px"></div></div>
+    <div class="card"><h3>Squared length of the noise</h3>
+      <div class="toolbar" style="margin-top:0"><span class="seg" id="dfSeg"><button data-v="res" class="on">leftover (1 df)</button><button data-v="abs">absorbed by fit (2 df)</button><button data-v="tot">total (3 df)</button></span></div>
+      <svg id="histSvg" role="img" aria-label="Histogram of squared lengths against the chi-square density"></svg>
+      <p class="small"><span class="sw" style="background:var(--data)"></span>marker: your current dataset, measured from the same center (shown only when σ is taken as known: truth and parametric).</p></div>
+    <div id="histNote" class="callout" style="margin:0"></div>
   </div>
   <div class="stack">
     <div class="view3d" id="view3dNoise"><div class="tag">violet: possible datasets · blue: their fits on the plane</div></div>
-    <p class="small" style="margin:0">Each violet point is a possible dataset <b>y</b> = <b>c</b> + <b>ε</b>. Dropping it onto the plane gives the blue point, which is that dataset's fit. Only the in-plane part of the noise survives, which is why the blue points form a flat disc and why (â, b̂) lives in two dimensions.</p>
+    <p class="small" style="margin:0">Each violet point is a dataset <b>y</b>. Its distance from the plane, measured along the green <b>u</b> line, is what the histogram counts. Dropping it onto the plane gives the blue point, its fit.</p>
   </div>
+</div>
+
+<h2>Part 2: the in-plane piece, and parameter uncertainty</h2>
+<p>The other piece of the noise survives the projection. Because the parameters are a fixed linear map of the data,</p>
+<div class="eq">(â, b̂)ᵀ = (XᵀX)⁻¹Xᵀ<b>y</b> &nbsp;⟹&nbsp; Cov(â, b̂) = (XᵀX)⁻¹Xᵀ · σ²I · X(XᵀX)⁻¹ = σ² (XᵀX)⁻¹</div>
+<p>In words: the covariance of the parameters is the covariance of <b>y</b>, pushed through the linear map that turns data into parameters. Because <b>1</b> and <b>x</b> are generally not perpendicular, the (a, b) grid on the plane is slanted, which tilts the ellipse: â and b̂ are correlated. Tick <i>center x</i> to make <b>1</b> ⟂ <b>x</b> − x̄ and the tilt disappears.</p>
+<div class="cols wide">
+  <div class="card"><h3>Parameter space (a, b)</h3><svg id="paramSvg" role="img" aria-label="Scatter of fitted a and b over many simulated datasets, with covariance ellipses"></svg>
+    <p class="small">Each dot is the fit (â, b̂) of one simulated dataset from the chosen cloud.</p></div>
+  <div class="card"><h3>Covariance</h3><div id="ro4" class="stack"></div></div>
 </div>
 <div class="callout">
   <p><b>What to take away.</b> Truth and parametric clouds agree in shape, because (â, b̂) is a fixed linear map of y and only the center moves. In practice only the fit-centered ones are available, and each trades an assumption for accuracy: the parametric one assumes Gaussian noise and uses σ̂; the residual one assumes nothing about the shape but has just n − p = 1 free residual direction to resample; the pairs one assumes nothing about the model but needs many more than three observations to stop producing degenerate resamples. The residual bootstrap also slightly understates the noise, because least squares makes residuals smaller than the true errors (a common fix rescales them by √(n/(n − p))). Try shrinking σ, spreading the x values, and switching modes to see which clouds respond.</p>

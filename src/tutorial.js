@@ -1,4 +1,4 @@
-import { createState, createScatter, createParamView, createModelView, buildSliders, xSliders, ySliders, abSliders, sigmaSlider,
+import { createState, createScatter, createParamView, createModelView, createHistView, histStats, buildSliders, xSliders, ySliders, abSliders, sigmaSlider,
   solve, fitParams, bootstrapSamples, MODES, setCenter, modelC, xbasis, xbar, covHTML, dot, sub, ONES, fmt, vfmt, clamp, gauss, add, scale, norm, colors } from './lib.js';
 
 const DEFAULT = { x: [0, 1, 2], y: [0, 3, 0], a: 2, b: -0.5, sigma: 1, center: false, cloudCenter: 'c' };
@@ -21,6 +21,8 @@ const scatter = createScatter($('scatter1'), state, { draggable: true, showFit: 
 const model3d = createModelView($('view3d'), state, { cloud: false });
 const noise3d = createModelView($('view3dNoise'), state, { cloud: true, minimal: true, camera: [11, 6, 9] });
 const param = createParamView($('paramSvg'), state);
+const hist = createHistView($('histSvg'), state);
+let stat = 'res';
 
 /* buttons */
 $('resetData').onclick = () => { state.x = [...DEFAULT.x]; state.y = [...DEFAULT.y]; state.emit(); };
@@ -31,6 +33,10 @@ $('ccSeg').onclick = (e) => {
   state.cloudCenter = v;
   [...$('ccSeg').children].forEach((b) => b.classList.toggle('on', b.dataset.v === v));
   state.emit();
+};
+$('dfSeg').onclick = (e) => {
+  const v = e.target.dataset && e.target.dataset.v; if (!v) return;
+  stat = v; state.emit();
 };
 $('draw').onclick = () => {
   const c = modelC(state);
@@ -81,10 +87,27 @@ function modeNote() {
   $('modeNote').innerHTML = h;
 }
 
+function histNote(st) {
+  if (!st) return '';
+  const mode = state.cloudCenter, n = st.zs.length;
+  const pct = (f) => Math.round((100 * st.zs.filter(f).length) / n);
+  if (mode === 'pairs') {
+    const zero = pct((z) => z < 1e-9);
+    return `<p><b>Pairs: RSS is not χ² at all.</b> Each resample is fit with its own x, and when it contains only one or two distinct points the line passes through them exactly. <b>${zero}%</b> of the resamples have RSS = 0 exactly, and the rest sit at a single value (those just reorder your original points). With three observations and two parameters there is nothing left to resample. Only the leftover (1 df) quantity is defined here, since there is no shared plane.</p>`;
+  }
+  if (mode === 'resid') return `<p><b>Residual bootstrap: a few spikes, not a curve.</b> Every resample is built from the same residual vector, which points along u, so the squared length along u can only take a handful of values. Scaled by σ̂² = RSS/(n − p) it is not a smooth χ²₁, even though it has the right average. The σ slider is ignored.</p>`;
+  const what = mode === 'c' ? 'The histogram follows the curve because the noise really is Gaussian with this σ and the model really is c.' : 'The center does not matter for the leftover part: u is perpendicular to the plane, so shifting the cloud within the plane leaves its distance along u unchanged. Only σ matters, and the curve is the same as for the truth.';
+  const extra = st.stat === 'tot' ? ' Total = absorbed + leftover, so the 3-df histogram is the sum of the other two.' : st.stat === 'abs' ? ' This part is what moves (â, b̂): the in-plane noise.' : '';
+  return `<p>${what}${extra} If you use the wrong σ the whole histogram scales, whatever df you use.</p>`;
+}
+
 function renderAll() {
   refresh.forEach((r) => r());
   setupTable(); readouts(); modeNote();
   scatter(); model3d(); noise3d(); param(true);
+  const st = hist(stat);
+  $('histNote').innerHTML = histNote(st);
+  [...$('dfSeg').children].forEach((b) => { b.classList.toggle('on', st && b.dataset.v === st.stat); b.classList.toggle('dis', state.cloudCenter === 'pairs' && b.dataset.v !== 'res'); });
 }
 state.on(renderAll);
 renderAll();
