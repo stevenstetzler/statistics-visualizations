@@ -41,6 +41,7 @@
       <div class="row">
         <button id="snap">Set (a, b) to least squares</button>
         <button id="reset">Reset</button>
+        <label class="chk"><input type="checkbox" id="center"> center x (use x − x̄)</label>
       </div>
     </section>
 
@@ -51,7 +52,8 @@
 
     <section>
       <h2>Where χ² comes from</h2>
-      <p class="small">Treat <b>c</b> as the true model and add Gaussian noise ε ~ N(0, I) (σ = 1). Each dot in 3-D is a possible dataset <b>y = c + ε</b>.</p>
+      <p class="small">Treat <b>c</b> as the true model and add Gaussian noise ε ~ N(0, σ²I). Each dot in 3-D is a possible dataset <b>y = c + ε</b>.</p>
+      <div id="noiseSliders"><div class="small">Data noise</div></div>
       <div class="row">
         <button id="draw">Draw data from the model</button>
         <label class="chk"><input type="checkbox" id="cloud" checked> noise cloud</label>

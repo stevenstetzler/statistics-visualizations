@@ -92,6 +92,7 @@ button:hover{border-color:var(--fit)}
       <div class="row">
         <button id="snap">Set (a, b) to least squares</button>
         <button id="reset">Reset</button>
+        <label class="chk"><input type="checkbox" id="center"> center x (use x − x̄)</label>
       </div>
     </section>
 
@@ -102,7 +103,8 @@ button:hover{border-color:var(--fit)}
 
     <section>
       <h2>Where χ² comes from</h2>
-      <p class="small">Treat <b>c</b> as the true model and add Gaussian noise ε ~ N(0, I) (σ = 1). Each dot in 3-D is a possible dataset <b>y = c + ε</b>.</p>
+      <p class="small">Treat <b>c</b> as the true model and add Gaussian noise ε ~ N(0, σ²I). Each dot in 3-D is a possible dataset <b>y = c + ε</b>.</p>
+      <div id="noiseSliders"><div class="small">Data noise</div></div>
       <div class="row">
         <button id="draw">Draw data from the model</button>
         <label class="chk"><input type="checkbox" id="cloud" checked> noise cloud</label>
@@ -125,8 +127,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/OrbitControls.js';
 
 /* ------------------------------------------------------------------ state */
-const DEFAULTS = { x: [0, 1, 2], y: [0, 3, 0], a: 2, b: -0.5 };
-const state = { x: [...DEFAULTS.x], y: [...DEFAULTS.y], a: DEFAULTS.a, b: DEFAULTS.b };
+const DEFAULTS = { x: [0, 1, 2], y: [0, 3, 0], a: 2, b: -0.5, sigma: 1 };
+const state = { x: [...DEFAULTS.x], y: [...DEFAULTS.y], a: DEFAULTS.a, b: DEFAULTS.b, sigma: DEFAULTS.sigma, center: false };
 
 /* ------------------------------------------------------------- small math */
 const dot = (p, q) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2];
@@ -159,6 +161,11 @@ function solve(x, y) {
   const u = degenerate ? [0, 0, 0] : unit(cross(e1, e2));
   return { a, b, yhat, r, e1, e2, u, degenerate };
 }
+
+/* model parametrisation: raw  c = a·1 + b·x   or centred  c = a·1 + b·(x − x̄·1) */
+const xbar = (x) => (x[0] + x[1] + x[2]) / 3;
+const xbasis = (x, center) => (center ? sub(x, scale(ONES, xbar(x))) : x);
+const rawLine = (s) => ({ a: s.center ? s.a - s.b * xbar(s.x) : s.a, b: s.b });
 
 /* ----------------------------------------------------------- three.js scene */
 const css = getComputedStyle(document.documentElement);
@@ -280,7 +287,7 @@ const rim = new THREE.LineLoop(
 rim.matrixAutoUpdate = false;
 scene.add(rim);
 let lattice = null;
-function buildLattice(x) {
+function buildLattice(x) { // x here is the second basis vector (x or x − x̄)
   if (lattice) { scene.remove(lattice); lattice.geometry.dispose(); }
   const pts = [];
   const pt = (a, b) => add(scale(ONES, a), scale(x, b));
@@ -322,6 +329,7 @@ const dashLine = dashed(col.resid, 0.35, 0.2);  // residual line extended throug
 const arrU = arrow(col.u, 0.35, 0.18);          // u from the origin: residual space
 const lblU = label('<b>u</b> residual space', col.u);
 const ra1 = polyline(col.resid, 3), ra2 = polyline(col.resid, 3); // right-angle marks
+const ra3 = polyline(col.cand, 3); // right angle between 1 and x − x̄ (centred mode)
 const lblZero = label('', col.muted);
 
 /* noise cloud */
@@ -339,33 +347,47 @@ const sliderHost = document.getElementById('sliders');
 const sliderDefs = [
   ...[0, 1, 2].map((i) => ({ key: 'x', i, name: `x${sub_(i + 1)}`, min: -3, max: 3, step: 0.1, group: i === 0 ? 'Predictor values' : '' })),
   ...[0, 1, 2].map((i) => ({ key: 'y', i, name: `y${sub_(i + 1)}`, min: -5, max: 5, step: 0.1, group: i === 0 ? 'Observed values' : '' })),
-  { key: 'a', name: 'a', min: -5, max: 5, step: 0.05, group: 'Your model  y = a + b·x' },
+  { key: 'a', name: 'a', min: -8, max: 8, step: 0.05, group: 'Your model  y = a + b·x' },
   { key: 'b', name: 'b', min: -3, max: 3, step: 0.05, group: '' },
+  { key: 'sigma', name: 'σ', min: 0.1, max: 3, step: 0.05, group: '', host: 'noiseSliders' },
 ];
+let modelHead = null;
 function sub_(n) { return '₀₁₂₃₄₅₆₇₈₉'[n]; }
 const sliderEls = sliderDefs.map((d) => {
-  if (d.group) { const h = document.createElement('div'); h.className = 'small'; h.style.marginTop = '10px'; h.textContent = d.group; sliderHost.appendChild(h); }
+  const host = d.host ? document.getElementById(d.host) : sliderHost;
+  if (d.group) { const h = document.createElement('div'); h.className = 'small'; h.style.marginTop = '10px'; h.textContent = d.group; host.appendChild(h); if (d.key === 'a') modelHead = h; }
   const row = document.createElement('div'); row.className = 'sl';
   row.innerHTML = `<label>${d.name}</label><input type="range" min="${d.min}" max="${d.max}" step="${d.step}"><output></output>`;
   const input = row.querySelector('input'), out = row.querySelector('output');
   input.addEventListener('input', () => { setVal(d, parseFloat(input.value)); update(); });
-  sliderHost.appendChild(row);
+  host.appendChild(row);
   return { d, input, out };
 });
 const getVal = (d) => (d.i === undefined ? state[d.key] : state[d.key][d.i]);
 function setVal(d, v) { if (d.i === undefined) state[d.key] = v; else state[d.key][d.i] = v; }
 
-document.getElementById('snap').onclick = () => { const f = solve(state.x, state.y); state.a = clamp(f.a, -5, 5); state.b = clamp(f.b, -3, 3); update(); };
-document.getElementById('reset').onclick = () => { state.x = [...DEFAULTS.x]; state.y = [...DEFAULTS.y]; state.a = DEFAULTS.a; state.b = DEFAULTS.b; update(); };
+document.getElementById('snap').onclick = () => {
+  const f = solve(state.x, state.y);
+  state.a = clamp(state.center ? f.a + f.b * xbar(state.x) : f.a, -8, 8); state.b = clamp(f.b, -3, 3); update();
+};
+document.getElementById('reset').onclick = () => { state.x = [...DEFAULTS.x]; state.y = [...DEFAULTS.y]; state.a = DEFAULTS.a; state.b = DEFAULTS.b; state.sigma = DEFAULTS.sigma; setCenter(false); update(); };
+// switch parametrisation while keeping the same point c in 3-D
+function setCenter(on) {
+  if (on !== state.center) { state.a = clamp(state.a + (on ? 1 : -1) * state.b * xbar(state.x), -8, 8); state.center = on; }
+  document.getElementById('center').checked = on;
+}
+document.getElementById('center').onchange = (ev) => { setCenter(ev.target.checked); update(); };
 document.getElementById('cloud').onchange = () => update();
 document.getElementById('stat').onchange = () => update();
 document.getElementById('draw').onclick = () => {
   const e = [gauss(), gauss(), gauss()];
-  const c = add(scale(ONES, state.a), scale(state.x, state.b));
-  state.y = add(c, e).map((v) => clamp(Math.round(v * 20) / 20, -5.5, 5.5));
+  const c = modelC(state);
+  state.y = add(c, scale(e, state.sigma)).map((v) => clamp(Math.round(v * 20) / 20, -5.5, 5.5));
   update();
 };
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+const modelC = (s) => add(scale(ONES, s.a), scale(xbasis(s.x, s.center), s.b));
 
 /* ------------------------------------------------- UI: 2-D scatter (SVG) */
 const sc = document.getElementById('scatter');
@@ -436,8 +458,7 @@ function drawHist(f) {
   for (let z = 0; z <= zmax; z += mode === 'res' ? 2 : 2) { mk('text', { x: px(z), y: HH - 8, 'text-anchor': 'middle', fill: col.muted, 'font-size': 10 }).textContent = z; }
   mk('text', { x: HW - HM.r, y: HM.t + 8, 'text-anchor': 'end', fill: col.fit, 'font-size': 11, 'font-weight': 600 }).textContent = `χ² with ${k} df`;
   // current dataset
-  const c = add(scale(ONES, state.a), scale(state.x, state.b));
-  const e = sub(state.y, c);
+  const e = scale(sub(state.y, modelC(state)), 1 / state.sigma);
   const resid = dot(e, f.u) ** 2, tot = dot(e, e);
   const z = mode === 'res' ? resid : mode === 'abs' ? tot - resid : tot;
   const zc = Math.min(z, zmax);
@@ -448,18 +469,20 @@ function drawHist(f) {
 /* ----------------------------------------------------------------- update */
 let lastX = '';
 function update() {
-  const { x, y, a, b } = state;
+  const { x, y, a, b, sigma, center } = state;
   const f = solve(x, y);
-  const c = add(scale(ONES, a), scale(x, b));
+  const xb = xbasis(x, center);
+  const c = modelC(state);
   const { yhat, r, e1, e2, u } = f;
 
   // sliders
+  modelHead.textContent = center ? 'Your model  y = a + b·(x − x̄)' : 'Your model  y = a + b·x';
   sliderEls.forEach(({ d, input, out }) => { const v = getVal(d); input.value = v; out.textContent = fmt(v, d.step < 0.1 ? 2 : 1); });
 
   // lattice/plane depend only on x
-  const xk = x.join(',');
+  const xk = x.join(',') + (center ? 'c' : '');
   if (xk !== lastX) {
-    lastX = xk; buildLattice(x);
+    lastX = xk; buildLattice(xb);
     if (!f.degenerate) {
       const m = new THREE.Matrix4().makeBasis(T(e1), T(e2), T(u));
       plane.matrix.copy(m); rim.matrix.copy(m);
@@ -468,14 +491,21 @@ function update() {
   plane.visible = rim.visible = lattice.visible = !f.degenerate;
 
   // 3-D objects
-  arrOne.set([0, 0, 0], ONES); arrX.set([0, 0, 0], x);
-  lblOne.at(ONES); lblX.at(x);
+  arrOne.set([0, 0, 0], ONES); arrX.set([0, 0, 0], xb);
+  lblOne.at(ONES); lblX.at(xb, center ? '<b>x − x̄</b>' : '<b>x</b>');
   const aOne = scale(ONES, a);
   legA.set([0, 0, 0], aOne); legB.set(aOne, c);
   ballC.position.copy(T(c));
-  lblC.at(c); lblA.at(scale(aOne, 0.5)); lblBx.at(add(aOne, scale(x, b * 0.5)));
+  lblC.at(c, center ? '<b>c</b> = a·1 + b·(x − x̄)' : '<b>c</b> = a·1 + b·x'); lblA.at(scale(aOne, 0.5)); lblBx.at(add(aOne, scale(xb, b * 0.5)), center ? 'b·(x − x̄)' : 'b·x');
   lblA.el.style.display = norm(aOne) > 0.6 ? '' : 'none';
-  lblBx.el.style.display = norm(scale(x, b)) > 0.6 ? '' : 'none';
+  lblBx.el.style.display = norm(scale(xb, b)) > 0.6 ? '' : 'none';
+  // right angle between the two legs, only when 1 ⟂ basis vector (centred)
+  const showRA3 = center && !f.degenerate && norm(aOne) > 0.6 && norm(scale(xb, b)) > 0.6;
+  ra3.visible = showRA3;
+  if (showRA3) {
+    const s = 0.35, d1 = scale(unit(ONES), -Math.sign(a)), d2 = scale(unit(xb), Math.sign(b));
+    ra3.set([add(aOne, scale(d1, s)), add(aOne, scale(add(d1, d2), s)), add(aOne, scale(d2, s))]);
+  }
 
   ballY.position.copy(T(y)); lblY.at(y);
   ballH.position.copy(T(yhat)); lblH.at(yhat);
@@ -497,11 +527,12 @@ function update() {
     ra2.set([add(yhat, scale(e2, s)), add(yhat, scale(add(e2, rh), s)), add(yhat, scale(rh, s))]);
   }
   lblR.show = rl > 0.15; lblE.show = norm(sub(y, c)) > 0.4;
+  lblZero.show = false;
 
   // noise cloud around c
   cloud.visible = document.getElementById('cloud').checked;
   const pos = cloudGeo.attributes.position;
-  for (let i = 0; i < N_CLOUD; i++) pos.setXYZ(i, c[0] + eps[i][0], c[1] + eps[i][1], c[2] + eps[i][2]);
+  for (let i = 0; i < N_CLOUD; i++) pos.setXYZ(i, c[0] + sigma * eps[i][0], c[1] + sigma * eps[i][1], c[2] + sigma * eps[i][2]);
   pos.needsUpdate = true;
 
   drawScatter(f);
@@ -510,7 +541,8 @@ function update() {
 }
 
 function drawScatter(f) {
-  const { x, y, a, b } = state;
+  const { x, y } = state;
+  const { a, b } = rawLine(state);
   const line = (el_, A, B) => { el_.setAttribute('x1', sx(XR[0])); el_.setAttribute('x2', sx(XR[1])); el_.setAttribute('y1', sy(A + B * XR[0])); el_.setAttribute('y2', sy(A + B * XR[1])); };
   line(sCand, a, b); line(sFit, f.a, f.b);
   for (let i = 0; i < 3; i++) {
@@ -522,7 +554,8 @@ function drawScatter(f) {
 }
 
 function drawReadout(f, c) {
-  const { x, y } = state;
+  const { x, y, sigma, center } = state;
+  const xb = xbasis(x, center), xs = center ? '(x − x̄)' : 'x';
   const { r, u, yhat } = f;
   const host = document.getElementById('readout');
   if (f.degenerate) {
@@ -530,17 +563,20 @@ function drawReadout(f, c) {
     return;
   }
   const ru = dot(r, u);
-  const e = sub(y, c);
+  const e = scale(sub(y, c), 1 / sigma);
   const tot = dot(e, e), resid = dot(e, u) ** 2, absorbed = tot - resid;
+  const cosT = dot(ONES, xb) / (Math.sqrt(3) * norm(xb)), ang = Math.acos(clamp(cosT, -1, 1)) * 180 / Math.PI;
   const kv = (k, v) => `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
   host.innerHTML =
-    kv('least-squares fit', `ŷ = ${fmt(f.a)} ${f.b < 0 ? '−' : '+'} ${fmt(Math.abs(f.b))}·x`) +
-    kv('fitted vector ŷ = â·1 + b̂·x', vfmt(yhat)) +
+    kv('angle between 1 and ' + (center ? 'x − x̄' : 'x'), `${fmt(ang, 1)}°  ${Math.abs(ang - 90) < 0.05 ? '(perpendicular)' : '(oblique: cos θ = ' + fmt(cosT, 3) + ')'}`) +
+    kv('least-squares fit', `ŷ = ${fmt(center ? f.a + f.b * xbar(x) : f.a)} ${f.b < 0 ? '−' : '+'} ${fmt(Math.abs(f.b))}·${xs}`) +
+    kv(`fitted vector ŷ = â·1 + b̂·${xs}`, vfmt(yhat)) +
     kv('residual vector r = y − ŷ', vfmt(r)) +
-    kv('perpendicular to both spanning vectors', `r·1 = ${fmt(dot(r, ONES))}  (residuals sum to 0)<br>r·x = ${fmt(dot(r, x))}  (uncorrelated with x)`) +
+    kv('perpendicular to both spanning vectors', `r·1 = ${fmt(dot(r, ONES))}  (residuals sum to 0)<br>r·${xs} = ${fmt(dot(r, xb))}  (uncorrelated with x)`) +
     kv('the single free residual direction', `u = ${vfmt(scale(u, 1))}<br>r = (r·u)·u with r·u = ${fmt(ru)}<br>‖r‖² = RSS = ${fmt(dot(r, r))} = (r·u)²`) +
-    kv('treat c as the truth, ε = y − c', `‖ε‖² = ${fmt(tot)} = <b style="color:${col.fit}">${fmt(absorbed)}</b> absorbed (2 df) + <b style="color:${col.resid}">${fmt(resid)}</b> left over (1 df)`) +
-    kv('RSS / σ², σ = 1, df = n − p = 1', `${fmt(resid)}   ~ χ²₁ if the model is right`);
+    kv(`treat c as the truth, ε = y − c  (σ = ${fmt(sigma)})`, `‖ε‖²/σ² = ${fmt(tot)} = <b style="color:${col.fit}">${fmt(absorbed)}</b> absorbed (2 df) + <b style="color:${col.resid}">${fmt(resid)}</b> left over (1 df)`) +
+    kv('RSS / σ², df = n − p = 1', `${fmt(resid)}   ~ χ²₁ if the model is right`) +
+    kv('estimated vs true noise', `σ̂² = RSS/(n − p) = ${fmt(dot(r, r))}<br>true σ² = ${fmt(sigma * sigma)}`);
 }
 
 /* ------------------------------------------------------------ frame loop */
