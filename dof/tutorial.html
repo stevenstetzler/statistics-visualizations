@@ -64,6 +64,13 @@ button:hover{border-color:var(--fit)}
 .kv .v .katex{font-size:1em}
 .card h3 .katex,h2 .katex{text-transform:none}
 
+/* disclaimer banner */
+.disclaimer{padding:8px 16px;font-size:13px;line-height:1.4;color:var(--muted);text-align:center;
+  background:color-mix(in srgb,var(--cand) 8%,var(--panel));border-bottom:1px solid var(--line)}
+body.explorer{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+body.explorer #app{flex:1;min-height:0;height:auto;grid-template-rows:minmax(0,1fr)}
+@media (max-width:900px){body.explorer{display:block;height:auto;overflow:visible}body.explorer #app{height:auto;grid-template-rows:60vh auto}}
+
 /* tutorial page */
 body.tut{height:auto}
 .tut main{max-width:1120px;margin:0 auto;padding:28px 20px 80px}
@@ -126,6 +133,7 @@ table.cmp th{color:var(--muted);font-size:12px;letter-spacing:.04em;text-transfo
 </script>
 </head>
 <body class="tut">
+<aside class="disclaimer" role="note">These are experimental learning materials generated with Claude code or another AI model. They are what I tried to get AI to teach me about, using a visualization to prove a point.</aside>
 <main>
 <header><h1 class="title">Exploring Model Fit Degrees of Freedom</h1></header>
 <nav class="top"><span>Statistics visualizations</span> · <a href="index.html">open the full explorer →</a></nav>
