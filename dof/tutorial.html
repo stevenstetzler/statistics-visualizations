@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exploring Model Fit Degrees of Freedom</title>
+<style>
+:root{
+  --bg:#f6f7f9; --panel:#ffffff; --ink:#1c2230; --muted:#5b6475; --line:#dde1e8;
+  --data:#e8590c; --fit:#1971c2; --resid:#e03131; --res-u:#2f9e44; --cand:#7048e8; --basis:#6b7280;
+  --stage:#fbfbfd;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#12151b; --panel:#1a1f28; --ink:#e7eaf0; --muted:#98a2b3; --line:#2b3240;
+    --data:#ff922b; --fit:#4dabf7; --resid:#ff6b6b; --res-u:#69db7c; --cand:#9775fa; --basis:#9aa3b2; --stage:#0e1117; }
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+#app{display:grid;grid-template-columns:1fr 380px;height:100vh}
+#stage{position:relative;overflow:hidden;background:var(--stage)}
+#view,#view canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;left:0;top:0;white-space:nowrap;font:600 12px/1 system-ui,sans-serif;transform:translate(8px,-50%);
+  text-shadow:0 0 3px var(--stage),0 0 3px var(--stage),0 0 3px var(--stage)}
+#legend{position:absolute;left:12px;top:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);
+  border-radius:8px;padding:8px 10px;font-size:12px;display:grid;gap:3px}
+.lg{display:flex;align-items:center;gap:7px}
+.lg i,.sw{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none}
+.sw{border-radius:2px;margin:0 3px 0 6px;vertical-align:-1px}
+#hint{position:absolute;left:12px;bottom:10px;color:var(--muted);font-size:12px}
+#side{overflow-y:auto;background:var(--panel);border-left:1px solid var(--line);padding:16px 18px 28px}
+h1{font-size:18px;margin:0 0 6px}
+h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+section{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.lede{color:var(--muted);margin:0}
+.small{color:var(--muted);font-size:12px;margin:6px 0 0}
+code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+svg{width:100%;height:auto;display:block;background:var(--bg);border-radius:8px;border:1px solid var(--line);touch-action:none}
+.sl{display:grid;grid-template-columns:34px 1fr 46px;align-items:center;gap:8px;margin:3px 0}
+.sl label{font-family:ui-monospace,monospace;font-size:12.5px}
+.sl output{font-family:ui-monospace,monospace;font-size:12.5px;text-align:right}
+.sl input{width:100%;accent-color:var(--fit)}
+.sl.grp{margin-top:10px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+button,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 10px;cursor:pointer}
+button:hover{border-color:var(--fit)}
+.chk{display:flex;align-items:center;gap:5px;cursor:pointer}
+#readout{display:grid;gap:6px}
+.kv{display:grid;grid-template-columns:1fr;gap:1px;padding:6px 8px;border-radius:6px;background:var(--bg)}
+.kv .k{color:var(--muted);font-size:12px}
+.kv .v{font-family:ui-monospace,monospace;font-size:12.5px}
+.warn{color:var(--resid);font-size:12px}
+@media (max-width:900px){
+  #app{grid-template-columns:1fr;grid-template-rows:60vh auto;height:auto}
+  #stage{height:60vh}
+  #side{border-left:0;border-top:1px solid var(--line)}
+  #legend{display:none}
+}
+
+/* math (KaTeX) */
+.katex{font-size:1.05em}
+.katex svg{background:none;border:0;border-radius:0;height:inherit;display:block;touch-action:auto}
+.m-data{color:var(--data)}.m-fit{color:var(--fit)}.m-cand{color:var(--cand)}.m-resid{color:var(--resid)}.m-u{color:var(--res-u)}
+.kv .v .katex{font-size:1em}
+.card h3 .katex,h2 .katex{text-transform:none}
+
+/* disclaimer banner */
+.disclaimer{padding:8px 16px;font-size:13px;line-height:1.4;color:var(--muted);text-align:center;
+  background:color-mix(in srgb,var(--cand) 8%,var(--panel));border-bottom:1px solid var(--line)}
+body.explorer{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+body.explorer #app{flex:1;min-height:0;height:auto;grid-template-rows:minmax(0,1fr)}
+@media (max-width:900px){body.explorer{display:block;height:auto;overflow:visible}body.explorer #app{height:auto;grid-template-rows:60vh auto}}
+
+/* tutorial page */
+body.tut{height:auto}
+.tut main{max-width:1120px;margin:0 auto;padding:28px 20px 80px}
+.tut nav.top{display:flex;gap:16px;font-size:13px;color:var(--muted);margin-bottom:6px}
+.tut a{color:var(--fit)}
+.tut h1{font-size:30px;margin:36px 0 8px;letter-spacing:-.01em}
+.tut h2{font-size:21px;text-transform:none;letter-spacing:0;color:var(--ink);margin:40px 0 8px}
+.tut h1.title{text-align:center;font-size:36px;margin:6px 0 14px;letter-spacing:-.02em}
+.tut nav.top{justify-content:center}
+.tut p,.tut li{max-width:70ch;font-size:15.5px}
+.tut p.lead{font-size:17px;color:var(--muted)}
+.callout{border-left:3px solid var(--cand);background:var(--panel);padding:8px 14px;border-radius:0 8px 8px 0;max-width:70ch;margin:14px 0}
+.callout p{margin:4px 0}
+.cols{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:20px;align-items:start;margin:14px 0}
+.cols.wide{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.card h3{margin:0 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.view3d{position:relative;height:440px;background:var(--stage);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.view3d canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.view3d .labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.view3d .tag{position:absolute;left:10px;bottom:8px;color:var(--muted);font-size:12px}
+table.data{border-collapse:collapse;font:13px ui-monospace,monospace;margin:8px 0}
+table.data th,table.data td{padding:3px 12px;text-align:right;border-bottom:1px solid var(--line)}
+table.data th{color:var(--muted);font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0;background:var(--panel)}
+.seg button.on{background:var(--cand);color:#fff}
+.toolbar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:12px 0}
+.toolbar .lab{font-size:13px;color:var(--muted)}
+.stack{display:grid;gap:10px}
+@media (max-width:900px){.cols,.cols.wide{grid-template-columns:1fr}.view3d{height:360px}}
+
+table.cmp{border-collapse:collapse;margin:14px 0;font-size:13.5px;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+table.cmp th,table.cmp td{padding:7px 10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+table.cmp th{color:var(--muted);font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+@media (max-width:900px){table.cmp{display:block;overflow-x:auto}}
+
+.slrow{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;margin:14px 0}
+@media (max-width:700px){.slrow{grid-template-columns:1fr}}
+.seg button.dis{opacity:.45}
+
+.slrow3{display:grid;grid-template-columns:1fr;gap:4px}
+.plots3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:14px 0}
+@media (max-width:900px){.plots3{grid-template-columns:1fr}}
+
+/* math */
+.tut .katex{font-size:1.12em}
+.tut .katex-display{margin:1.1em 0;padding:.35em 0;overflow-x:auto;overflow-y:hidden;max-width:70ch}
+.tut .callout .katex-display{margin:.7em 0}
+.tut table.cmp .katex{font-size:1.05em}
+.tut h1 .katex,.tut h2 .katex,.tut h3 .katex{font-size:1em}
+.m-data{color:var(--data)}.m-fit{color:var(--fit)}.m-cand{color:var(--cand)}.m-resid{color:var(--resid)}.m-u{color:var(--res-u)}.tut p.small{font-size:12.5px}
+
+</style>
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<script defer src="vendor/katex/katex.min.js"></script>
+<script defer src="vendor/katex/auto-render.min.js"></script>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/" } }
+</script>
+</head>
+<body class="tut">
+<aside class="disclaimer" role="note">These are experimental learning materials generated with Claude code or another AI model. They are what I tried to get AI to teach me about, using a visualization to prove a point.</aside>
+<main>
+<header><h1 class="title">Exploring Model Fit Degrees of Freedom</h1></header>
+<nav class="top"><span>Statistics visualizations</span> · <a href="index.html">open the full explorer →</a></nav>
+
+<h1>Introduction</h1>
+<p class="lead">Fit a line to three points and something quietly strange happens: the three numbers you measured are <em>not</em> three independent pieces of information once you have estimated a slope and an intercept. This page builds the picture that explains why, and what it does to the uncertainty of your fit.</p>
+<p>We will look at one tiny problem in two ways:</p>
+<ul>
+  <li><b>The traditional view</b>: three dots in the \(x\)–\(y\) plane and a line through them.</li>
+  <li><b>The model view</b>: the three \(y\) values stacked into a single point in \(\mathbb R^3\). A line \(y = a + b\,x\) can only reach a flat 2-D plane inside that space. Least squares drops a perpendicular onto the plane, and the leftover (the residual) lives in the one remaining direction: <b>\(n - p = 3 - 2 = 1\) degree of freedom</b>.</li>
+</ul>
+<p>Then we add noise. Noise in \(y\) is a cloud in \(\mathbb R^3\); fitting flattens it onto the plane; and the flattened cloud, read in the coordinates \((a, b)\), <em>is</em> the uncertainty of the parameters.</p>
+
+<h1>The Setup</h1>
+<p>We observe three pairs \((x_i, y_i)\) and assume the data were generated by a straight line plus independent Gaussian noise:</p>
+$$\begin{aligned}
+y_i &= a + b\,x_i + \varepsilon_i, \qquad i = 1, 2, 3,\\
+\varepsilon_i &\overset{\text{iid}}{\sim} \mathcal N(0, \sigma^2).
+\end{aligned}$$
+<p>Stack the three equations into vectors. Each observation gets its own axis, so \(\mathbf y\) is a single point in \(\mathbb R^3\), with \(\mathbf 1 = (1,1,1)\):</p>
+$$\begin{aligned}
+\mathbf y &= a\,\mathbf 1 + b\,\mathbf x + \boldsymbol\varepsilon \\
+          &= X\theta + \boldsymbol\varepsilon,
+\qquad
+X = \begin{bmatrix} \mathbf 1 & \mathbf x \end{bmatrix}
+  = \begin{bmatrix} 1 & x_1 \\ 1 & x_2 \\ 1 & x_3 \end{bmatrix},
+\quad
+\theta = \begin{bmatrix} a \\ b \end{bmatrix}.
+\end{aligned}$$
+<p>We do not know \(a\) and \(b\), so we estimate them by least squares: choose \(\hat\theta\) to make the leftover as short as possible.</p>
+$$\begin{aligned}
+\hat\theta = \begin{bmatrix} \hat a \\ \hat b \end{bmatrix}
+  &= \arg\min_{\theta}\, \lVert \mathbf y - X\theta \rVert^2
+   = (X^\top X)^{-1} X^\top \mathbf y, \\[4pt]
+\hat{\mathbf y} &= X\hat\theta, \qquad
+\mathbf r = \mathbf y - \hat{\mathbf y}, \qquad
+\mathrm{RSS} = \lVert \mathbf r \rVert^2.
+\end{aligned}$$
+<p>Here are the current numbers (they update as you use the sliders below):</p>
+<div id="setupTable"></div>
+
+<h1>The Traditional View</h1>
+<p>This is the picture you already know. Each dot is an observation \((x_i, y_i)\). The blue line is the least-squares fit and the red segments are the residuals \(r_i = y_i - \hat y_i\). Move the sliders (or drag the dots up and down) and watch the line follow.</p>
+<div class="cols">
+  <div class="card"><h3>x–y plane</h3><svg id="scatter1" role="img" aria-label="Scatter plot of three points and the least-squares line"></svg>
+    <p class="small"><span class="sw" style="background:var(--fit)"></span>least-squares line. Red: residuals.</p></div>
+  <div class="card"><h3>Predictors and observations</h3><div class="small">x values</div><div id="slX"></div><div class="small" style="margin-top:8px">y values</div><div id="slY"></div>
+    <div class="row"><button id="resetData">Reset to example</button></div>
+    <div id="ro2" class="stack" style="margin-top:10px"></div></div>
+</div>
+<div class="callout"><p>Notice what the residuals do as you move a point: they are never free. The residuals always sum to zero, and they are always uncorrelated with \(x\). Two constraints on three residuals. That is the first hint that only one of them is "free".</p></div>
+
+<h1>The Model View</h1>
+<p>Now forget the x-axis. Give each observation its own axis, so the whole dataset is <b>one point</b> \(\ycol\) in \(\mathbb R^3\). Every line \(a + b\,x\) predicts a vector
+$$\mathbf c = a\,\mathbf 1 + b\,\mathbf x.$$
+As \(a\) and \(b\) vary, \(\mathbf c\) sweeps out a <b style="color:var(--fit)">plane</b> through the origin, spanned by \(\mathbf 1\) and \(\mathbf x\). The faint grid on the plane is the \((a, b)\) coordinate system.</p>
+<p>Use the sliders to pick a model \(\ccol\). The distance from \(\mathbf c\) to \(\mathbf y\) is that model's total error. The closest point on the plane is \(\yhcol\), and the segment from \(\hat{\mathbf y}\) to \(\mathbf y\), the residual \(\rcol\), meets the plane at a right angle.</p>
+<div class="cols">
+  <div class="stack">
+    <div class="card"><h3>Choose a model (a, b)</h3><div id="slAB"></div>
+      <div class="row"><button id="snap">Set (a, b) to least squares</button></div></div>
+    <div class="card"><h3>Same data, new axes</h3><div class="small">The x and y values are the ones from the previous section.</div><div id="ro3" class="stack" style="margin-top:8px"></div></div>
+  </div>
+  <div class="view3d" id="view3d"><div class="tag">drag to rotate · scroll to zoom</div></div>
+</div>
+<div class="callout">
+  <p><b>Why 1 degree of freedom?</b> The plane is 2-dimensional (\(p = 2\)). Whatever is not in the plane must be perpendicular to it, and \(\mathbb R^3\) has only \(3 - 2 = 1\) perpendicular direction, the green \(\ucol\). So \(\mathbf r\) always points along \(\pm\mathbf u\), and the residuals carry exactly one number's worth of information.</p>
+  <p>The right angles are the <b>normal equations</b>:</p>
+  $$\begin{aligned}
+  \mathbf r \cdot \mathbf 1 &= 0 &&\text{(residuals sum to zero)}\\
+  \mathbf r \cdot \mathbf x &= 0 &&\text{(uncorrelated with } x\text{)}
+  \end{aligned}
+  \qquad\Longleftrightarrow\qquad X^\top \mathbf r = \mathbf 0 .$$
+</div>
+
+<h1>The effect of noise</h1>
+<p>So far the data were fixed. But <b>y</b> is a noisy measurement: had we run the experiment again we would have gotten a different <b>y</b>. Suppose the truth is the model \(\ccol\) and each dataset is
+$$\mathbf y = \mathbf c + \boldsymbol\varepsilon, \qquad \boldsymbol\varepsilon \sim \mathcal N(0, \sigma^2 I_3).$$
+In \(\mathbb R^3\) that is a round fuzzy cloud centered on \(\mathbf c\).</p>
+<p>Fitting projects every point of that cloud onto the plane, which splits the noise into two perpendicular pieces. Writing \(P\) for the projection onto the plane and \(\mathbf u\) for the unit vector perpendicular to it:</p>
+$$\boldsymbol\varepsilon
+ = \underbrace{P\boldsymbol\varepsilon}_{\text{in the plane (2 directions)}}
+ + \underbrace{(\boldsymbol\varepsilon\cdot\mathbf u)\,\mathbf u}_{\text{perpendicular (1 direction)}} .$$
+<p>Each piece has its own consequence:</p>
+<ul>
+  <li>The <b>perpendicular</b> piece becomes the residual. It is a single coordinate along \(\mathbf u\), so \(\mathrm{RSS}/\sigma^2\) is one squared standard normal: <b>\(\chi^2_1\)</b>.</li>
+  <li>The <b>in-plane</b> piece moves the fit. Read in the \((a, b)\) coordinates of the plane, the flattened cloud <em>is</em> the sampling distribution of the parameters: <b>\(\operatorname{Cov}(\hat a, \hat b) = \sigma^2 (X^\top X)^{-1}\)</b>.</li>
+</ul>
+
+<h2>Where should the cloud come from?</h2>
+<p>The orange dataset is a single draw. To say how much the fit would wobble from draw to draw we need many datasets, and there are four standard ways to get them. They differ in <b>where they are centered</b> and <b>where the noise comes from</b>. Pick one below; both analyses that follow use it.</p>
+<table class="cmp">
+<tr><th>Cloud</th><th>Centered on</th><th>Noise comes from</th><th>Needs</th><th>With \(n = 3\)</th></tr>
+<tr><td><b>Truth \(\mathbf c\)</b><br><span class="small">the sampling distribution</span></td><td>the true \(\mathbf c = a\mathbf 1 + b\mathbf x\)</td><td>the true \(\mathcal N(0, \sigma^2)\)</td><td>\(\mathbf c\) and \(\sigma\), known. Only possible in a simulation like this one.</td><td>Exact. Ellipse \(= \sigma^2 (X^\top X)^{-1}\).</td></tr>
+<tr><td><b>Parametric</b><br><span class="small">bootstrap</span></td><td>the fit \(\hat{\mathbf y}\)</td><td>a Gaussian \(\mathcal N(0, \hat\sigma^2)\)</td><td>the model is right. The \(\sigma\) slider plays the role of \(\hat\sigma\).</td><td>Same shape as the truth cloud, but sitting on your fit. Accuracy depends on \(\hat\sigma\).</td></tr>
+<tr><td><b>Residual</b><br><span class="small">bootstrap</span></td><td>the fit \(\hat{\mathbf y}\)</td><td>your own residuals, drawn with replacement</td><td>errors that are iid, but no assumed shape.</td><td>Poor. There is effectively one residual, e.g. \((c, -2c, c)\), so every resample is a rearrangement of the same three numbers.</td></tr>
+<tr><td><b>Pairs</b><br><span class="small">(case) bootstrap</span></td><td>nothing: the observations themselves</td><td>resampled \((x_i, y_i)\) pairs</td><td>observations that are iid draws, with x random too.</td><td>Breaks down. Only 27 possible resamples. 3 have identical x (no slope), 18 use two distinct points (a perfect line), and the other 6 just reorder your original three points.</td></tr>
+</table>
+<p>Geometrically, the first three all keep the plane fixed and scatter \(\mathbf y\) around a center, so fitting just projects the cloud onto the plane. The <b>pairs bootstrap is different</b>: resampling pairs changes \(\mathbf x\) too, so every resample has its own plane and its own residual direction. There is no single plane to project onto, which is why the blue "fits" disappear in that mode.</p>
+
+<div class="toolbar">
+  <span class="lab">Cloud</span>
+  <span class="seg" id="ccSeg"><button data-v="c" class="on">truth c</button><button data-v="fit">parametric (ŷ)</button><button data-v="resid">residual (ŷ)</button><button data-v="pairs">pairs</button></span>
+  <label class="chk"><input type="checkbox" id="centerX"> center x</label>
+  <button id="draw">Draw a dataset from the truth</button>
+</div>
+<div id="modeNote" class="callout" style="margin-top:0"></div>
+<div class="card slrow"><div id="slAB2"></div><div id="slSigma"></div></div>
+
+<h2>Part 1: the perpendicular piece, and \(\chi^2\)</h2>
+<p>The residual space is one-dimensional, so the leftover noise has exactly one coordinate, \(\boldsymbol\varepsilon\cdot\mathbf u \sim \mathcal N(0, \sigma^2)\). Squared and divided by \(\sigma^2\), that is one standard normal squared, a <b>\(\chi^2\) with 1 degree of freedom</b>:</p>
+$$\frac{\mathrm{RSS}}{\sigma^2}
+ = \frac{\lVert \mathbf r \rVert^2}{\sigma^2}
+ = \left(\frac{\boldsymbol\varepsilon\cdot\mathbf u}{\sigma}\right)^{2}
+ \sim \chi^2_1 .$$
+<p>This is the mechanism behind "df \(= n - p\)": each fitted parameter removes a direction that the leftover noise could have pointed along. The histogram below measures that squared length for 4000 datasets from the chosen cloud, against the \(\chi^2\) curve. Switch the quantity to see that the pieces add up: <b>\(3 = 2 + 1\)</b>, the dimension of the plane plus the dimension left over.</p>
+<div class="cols wide">
+  <div class="stack">
+    <div class="card"><h3>Squared length of the noise</h3>
+      <div class="toolbar" style="margin-top:0"><span class="seg" id="dfSeg"><button data-v="res" class="on">leftover (1 df)</button><button data-v="abs">absorbed by fit (2 df)</button><button data-v="tot">total (3 df)</button></span></div>
+      <svg id="histSvg" role="img" aria-label="Histogram of squared lengths against the chi-square density"></svg>
+      <p class="small"><span class="sw" style="background:var(--data)"></span>marker: your current dataset, measured from the same center (shown only when \(\sigma\) is taken as known: truth and parametric).</p></div>
+    <div id="histNote" class="callout" style="margin:0"></div>
+  </div>
+  <div class="stack">
+    <div class="view3d" id="view3dNoise"><div class="tag">violet: possible datasets · blue: their fits on the plane</div></div>
+    <p class="small" style="margin:0">Each violet point is a dataset \(\mathbf y\). Its distance from the plane, measured along the green \(\mathbf u\) line, is what the histogram counts. Dropping it onto the plane gives the blue point, its fit.</p>
+  </div>
+</div>
+
+<h2>Part 2: the in-plane piece, and parameter uncertainty</h2>
+<p>The other piece of the noise survives the projection. Because the parameters are a fixed linear map of the data, their covariance is the covariance of \(\mathbf y\) pushed through that map:</p>
+$$\begin{aligned}
+\hat\theta &= (X^\top X)^{-1} X^\top \mathbf y, \\[2pt]
+\operatorname{Cov}(\hat\theta)
+  &= (X^\top X)^{-1} X^\top \,\bigl(\sigma^2 I\bigr)\, X (X^\top X)^{-1} \\[2pt]
+  &= \sigma^2 (X^\top X)^{-1}.
+\end{aligned}$$
+<p>For our design the matrix is small enough to write out, which shows where the tilt of the ellipse comes from:</p>
+$$X^\top X = \begin{bmatrix} 3 & \sum x_i \\[2pt] \sum x_i & \sum x_i^2 \end{bmatrix},
+\qquad
+\operatorname{Cov}(\hat a, \hat b) = \frac{\sigma^2}{3\sum x_i^2 - \bigl(\sum x_i\bigr)^2}
+\begin{bmatrix} \sum x_i^2 & -\sum x_i \\[2pt] -\sum x_i & 3 \end{bmatrix}.$$
+<p>The off-diagonal term is nonzero whenever \(\sum x_i \neq 0\), that is whenever \(\mathbf 1\) and \(\mathbf x\) are not perpendicular: the \((a, b)\) grid on the plane is slanted, so \(\hat a\) and \(\hat b\) are correlated. Tick <i>center x</i> to replace \(\mathbf x\) by \(\mathbf x - \bar x\mathbf 1\), which is perpendicular to \(\mathbf 1\), and the covariance becomes diagonal:</p>
+$$\operatorname{Cov}(\hat a, \hat b) = \sigma^2 \begin{bmatrix} 1/3 & 0 \\ 0 & 1/\lVert \mathbf x - \bar x\mathbf 1 \rVert^2 \end{bmatrix}.$$
+<div class="cols wide">
+  <div class="card"><h3>Parameter space (a, b)</h3><svg id="paramSvg" role="img" aria-label="Scatter of fitted a and b over many simulated datasets, with covariance ellipses"></svg>
+    <p class="small">Each dot is the fit \((\hat a, \hat b)\) of one simulated dataset from the chosen cloud.</p></div>
+  <div class="card"><h3>Covariance</h3><div id="ro4" class="stack"></div></div>
+</div>
+<div class="callout">
+  <p><b>What to take away.</b> Truth and parametric clouds agree in shape, because \((\hat a, \hat b)\) is a fixed linear map of \(\mathbf y\) and only the center moves. In practice only the fit-centered ones are available, and each trades an assumption for accuracy: the parametric one assumes Gaussian noise and uses \(\hat\sigma\); the residual one assumes nothing about the shape but has just \(n - p = 1\) free residual direction to resample; the pairs one assumes nothing about the model but needs many more than three observations to stop producing degenerate resamples. The residual bootstrap also slightly understates the noise, because least squares makes residuals smaller than the true errors (a common fix rescales them by \(\sqrt{n/(n-p)}\)). Try shrinking \(\sigma\), spreading the \(x\) values, and switching modes to see which clouds respond.</p>
+</div>
+
+<h1>Does your model fit?</h1>
+<p>Everything above asked how much a fit would wobble if the truth were known. Now turn it around: given <em>one</em> dataset, is the model a plausible explanation of it? If the line model is right and the noise is Gaussian with a known \(\sigma\), then the squared lengths of the pieces of \(\mathbf y\) have known distributions, and you can ask where yours landed:</p>
+<table class="cmp">
+<tr><th>Quantity</th><th>What it measures</th><th>If the model is right</th><th>df</th></tr>
+<tr><td>\(\htmlClass{m-fit}{\mathrm{RSS}/\sigma^2}\)</td><td>how far the data are from the <em>best</em> line</td><td>\(\chi^2_1\)</td><td>\(n - p = 3 - 2\): the plane has absorbed 2 directions of noise</td></tr>
+<tr><td>\(\htmlClass{m-cand}{\lVert\mathbf y - \mathbf c\rVert^2/\sigma^2}\)</td><td>how far the data are from <em>your</em> \((a, b)\)</td><td>\(\chi^2_3\)</td><td>\(n = 3\): nothing was estimated, so no direction is absorbed</td></tr>
+<tr><td>\(\lVert\hat{\mathbf y} - \mathbf c\rVert^2/\sigma^2\)</td><td>how far your \((a, b)\) is from the best line, inside the plane</td><td>\(\chi^2_2\)</td><td>the 2 directions the fit absorbed</td></tr>
+</table>
+<p>They are linked by Pythagoras, which is the \(3 = 1 + 2\) split from before:</p>
+$$\underbrace{\lVert \mathbf y - \mathbf c \rVert^2}_{\sigma^2\chi^2_3}
+ \;=\; \underbrace{\lVert \mathbf y - \hat{\mathbf y} \rVert^2}_{\sigma^2\chi^2_1}
+ \;+\; \underbrace{\lVert \hat{\mathbf y} - \mathbf c \rVert^2}_{\sigma^2\chi^2_2}.$$
+<p>Change the data or your model below and watch the markers move. The shaded area is the <b>tail probability</b>: how often noise alone would produce something at least this large.</p>
+<div class="cols">
+  <div class="stack">
+    <div class="card"><h3>Data and your model</h3><svg id="scatter2" role="img" aria-label="Scatter plot with the best-fit line and your chosen line"></svg>
+      <p class="small"><span class="sw" style="background:var(--fit)"></span>best-fit line, <span class="sw" style="background:var(--cand)"></span>your \((a, b)\) line. <b>Blue band:</b> every line whose \((a, b)\) lies inside the 95% parameter ellipse for the current \(\sigma\). <b>Violet band:</b> \(\pm\sigma\) of noise around your line.</p></div>
+  </div>
+  <div class="stack">
+    <div class="card slrow3"><div id="slY3"></div><div id="slAB3"></div><div id="slSigma3"></div></div>
+    <div class="row" style="margin-top:0"><button id="snap2">Set (a, b) to least squares</button>
+      <button id="curved">Load curved data (0, 3, 0)</button></div>
+  </div>
+</div>
+<div class="plots3">
+  <div class="card"><h3 style="color:var(--fit)">Best-fit line · \(\chi^2_1\)</h3><svg id="chi1" role="img" aria-label="Chi-square with 1 degree of freedom and the best-fit RSS marked"></svg><div id="v1" class="small"></div></div>
+  <div class="card"><h3 style="color:var(--cand)">Your \((a, b)\) · \(\chi^2_3\)</h3><svg id="chi3" role="img" aria-label="Chi-square with 3 degrees of freedom and your model's error marked"></svg><div id="v3" class="small"></div></div>
+  <div class="card"><h3>Your \((a, b)\) vs the best line · \(\chi^2_2\)</h3><svg id="chi2" role="img" aria-label="Chi-square with 2 degrees of freedom and the in-plane distance marked"></svg><div id="v2" class="small"></div></div>
+</div>
+<div id="verdict" class="callout"></div>
+<div class="callout">
+  <p><b>Why a steep line can still pass at large \(\sigma\).</b> Every distance in these tests is measured in units of \(\sigma\). Raise \(\sigma\) and the same gap between the data and a line becomes a smaller number of noise-units, so more lines look plausible. In the picture, two things grow together:</p>
+  <ul>
+    <li>The <b>blue band</b> widens: the uncertainty in \((a, b)\), which scales as \(\sigma^2 (X^\top X)^{-1}\), now allows a larger family of lines. A line passes the \(\chi^2_2\) test exactly when its \((a, b)\) lies inside the 95% ellipse from Part 2, which is the same as the line staying inside the band over all \(x\):
+      $$\frac{\lVert\hat{\mathbf y} - \mathbf c\rVert^2}{\sigma^2} \le 5.99
+      \iff
+      \bigl|c(x) - \hat y(x)\bigr| \le \sqrt{5.99}\,\sigma\sqrt{h(x)}\ \ \text{for all } x,
+      \qquad
+      h(x) = \begin{bmatrix}1 & x\end{bmatrix}(X^\top X)^{-1}\begin{bmatrix}1 \\ x\end{bmatrix}.$$</li>
+    <li>The <b>violet band</b> widens: the \(\pm\sigma\) noise around your line now covers the data points, so the \(\chi^2_3\) error, \(\lVert\mathbf y - \mathbf c\rVert^2/\sigma^2\), is small.</li>
+  </ul>
+  <p>The steep line passes because, at this \(\sigma\), the data cannot rule it out. That is a statement about how little three noisy points can tell you, not evidence that the line is right. Shrink \(\sigma\) and the bands tighten, and the same line fails.</p>
+</div>
+<h2>What does “X% of noise draws are this large” mean?</h2>
+<p>Under each plot you will see a sentence like <em>“If the model were true, 1.4% of repeated experiments would give a value at least this large.”</em> It describes a thought experiment, and it is worth spelling out:</p>
+<ol>
+  <li><b>Assume the model is exactly right:</b> the truth is the line \(\mathbf c\) and the noise is Gaussian with the \(\sigma\) on the slider.</li>
+  <li><b>Repeat the experiment</b> over and over. Each repeat gives a new dataset \(\mathbf y = \mathbf c + \boldsymbol\varepsilon\) and so a new value of the statistic (\(\mathrm{RSS}/\sigma^2\), and so on).</li>
+  <li><b>Ask what fraction of those repeats give a value at least as large</b> as the one you actually measured. That fraction is the shaded area under the curve, the <b>tail probability</b> or p-value. The text under each plot also counts it directly in 4000 simulated repeats, so you can check the curve against the simulation.</li>
+</ol>
+<p>So “1.4% of noise draws are this large” means: if nothing but noise of this size were going on, you would see a mismatch this big about once in 70 experiments.</p>
+<div class="callout">
+  <p><b>What are you aiming for?</b> Not for the biggest p, and not for the smallest error. You are aiming to <b>not be surprised</b>: the marker should sit where noise of this size ordinarily puts it, in the body of the curve and not out in either tail.</p>
+  <ul>
+    <li><b>Why not maximize p?</b> If the model really is right, p is spread evenly between 0 and 1, so 0.9 is just as likely as 0.1. A value of 0.99 is not extra good; it is as unusual as 0.01, and says the data are suspiciously close to the model (or that \(\sigma\) was set too large).</li>
+    <li><b>The cutoff is a convention.</b> We call p below about 0.05 a right tail. But a perfectly correct model lands there about 1 time in 20, so one borderline value is weak evidence. Treat the tails as "worth a second look", not as a verdict.</li>
+    <li><b>"Good choice" means "no evidence against it."</b> A typical value says the data are consistent with the model plus noise. It does not prove the model is right, and other models may be just as consistent.</li>
+    <li><b>Use the right reference curve.</b> The \(\chi^2_3\) panel is only valid for an \((a, b)\) fixed <em>before</em> looking at \(\mathbf y\). If you chose \((a, b)\) by tuning it to these data, including "set to least squares", you have fitted two parameters, and the honest reference is \(\chi^2_1\), the best-fit panel. Comparing a tuned model to \(\chi^2_3\) is too lenient.</li>
+    <li><b>The \(\chi^2_2\) panel asks a different question</b>: can the data tell your \((a, b)\) apart from the best line? A small tail means yes, your choice is detectably worse. A large p means the data cannot distinguish them, which is the same as your \((a, b)\) lying inside the ellipse from Part 2.</li>
+  </ul>
+</div>
+
+<h2>How to read it</h2>
+<ul>
+  <li><b>Right tail (small p).</b> The data are farther from the model than noise of this size usually puts them. Either the model is the wrong shape (here, the points bend and a line cannot follow), or the noise is larger than the \(\sigma\) you assumed.</li>
+  <li><b>Left tail (p near 1).</b> The data are suspiciously close to the model, closer than noise of this size should allow. That usually means \(\sigma\) was overestimated, not that the fit is good. Note that for 1 df, small values are <em>normal</em>: \(\chi^2_1\) piles up near zero, so \(\mathrm{RSS} \approx 0\) is not suspicious at all.</li>
+  <li><b>Middle.</b> The data are consistent with the model plus noise. That is evidence of no contradiction, not proof the model is right.</li>
+</ul>
+<div class="callout">
+  <p><b>The catch: \(\sigma\) has to come from somewhere else.</b> If you instead estimate
+  $$\hat\sigma^2 = \frac{\mathrm{RSS}}{n - p}$$
+  from the same fit, then \(\mathrm{RSS}/\hat\sigma^2\) is identically 1 and the test says nothing. With 1 degree of freedom you cannot both estimate the noise and check the fit with the same three points. You need \(\sigma\) from outside the data (a measurement spec, a calibration, replicates), or more observations than parameters by a good margin.</p>
+  <p><b>Try this.</b> The starting data lie close to a line, so the best line leaves a small \(\mathrm{RSS}/\sigma^2\) and sits comfortably in the bulk of \(\chi^2_1\). Now click <i>Load curved data (0, 3, 0)</i>: with \(\sigma = 1\) the best line has \(\mathrm{RSS}/\sigma^2 = 6\), out in the right tail (\(p \approx 0.014\)), because a line is a poor description of three points that bend. Raise \(\sigma\) to 2 and the same data are unremarkable, or drag \(y_2\) toward 1 so the points line up. Meanwhile your \((a, b)\) can be a bad choice even when the line family fits: the \(\chi^2_2\) panel shows how far it sits from the best line, which is the same question as whether the point \((a, b)\) falls inside the ellipse from Part 2 (the 95% contour is at 5.99).</p>
+</div>
+</main>
+<script type="module">
+import { createState, createScatter, createParamView, createModelView, createHistView, histStats, createChiPlot, chiSf, simTail, typeset, setHTML, buildSliders, xSliders, ySliders, abSliders, sigmaSlider,
+  solve, fitParams, bootstrapSamples, MODES, setCenter, modelC, xbasis, xbar, covHTML, dot, sub, ONES, fmt, vfmt, clamp, gauss, add, scale, norm, colors } from './lib.js';
+
+const DEFAULT = { x: [0, 1, 2], y: [1, 2.6, 3], a: 0.5, b: 1.2, sigma: 1, center: false, cloudCenter: 'c' };
+const state = createState(DEFAULT);
+const $ = (id) => document.getElementById(id);
+const col = colors();
+const kv = (k, v) => `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+
+/* sliders */
+const refresh = [
+  buildSliders($('slX'), xSliders(), state),
+  buildSliders($('slY'), ySliders(), state),
+  buildSliders($('slAB'), abSliders(), state),
+  buildSliders($('slAB2'), abSliders(), state),
+  buildSliders($('slSigma'), [sigmaSlider()], state),
+  buildSliders($('slY3'), ySliders(), state),
+  buildSliders($('slAB3'), abSliders(), state),
+  buildSliders($('slSigma3'), [sigmaSlider()], state),
+];
+
+/* views */
+const scatter = createScatter($('scatter1'), state, { draggable: true, showFit: true });
+const model3d = createModelView($('view3d'), state, { cloud: false });
+const noise3d = createModelView($('view3dNoise'), state, { cloud: true, minimal: true, camera: [11, 6, 9] });
+const param = createParamView($('paramSvg'), state);
+const hist = createHistView($('histSvg'), state);
+const scatter2 = createScatter($('scatter2'), state, { draggable: true, showCand: true, showFit: true, bands: true });
+const chi1 = createChiPlot($('chi1'), 1, col.fit), chi2 = createChiPlot($('chi2'), 2, col.ink), chi3 = createChiPlot($('chi3'), 3, col.cand);
+let stat = 'res';
+
+/* buttons */
+$('resetData').onclick = () => { state.x = [...DEFAULT.x]; state.y = [...DEFAULT.y]; state.emit(); };
+$('snap').onclick = $('snap2').onclick = () => { const p = fitParams(state, state.y); state.a = clamp(p.a, -8, 8); state.b = clamp(p.b, -3, 3); state.emit(); };
+$('centerX').onchange = (e) => { setCenter(state, e.target.checked); state.emit(); };
+$('ccSeg').onclick = (e) => {
+  const v = e.target.dataset && e.target.dataset.v; if (!v) return;
+  state.cloudCenter = v;
+  [...$('ccSeg').children].forEach((b) => b.classList.toggle('on', b.dataset.v === v));
+  state.emit();
+};
+$('dfSeg').onclick = (e) => {
+  const v = e.target.dataset && e.target.dataset.v; if (!v) return;
+  stat = v; state.emit();
+};
+$('curved').onclick = () => { state.x = [0, 1, 2]; state.y = [0, 3, 0]; state.emit(); };
+$('draw').onclick = () => {
+  const c = modelC(state);
+  state.y = add(c, scale([gauss(), gauss(), gauss()], state.sigma)).map((v) => clamp(Math.round(v * 20) / 20, -5.5, 5.5));
+  state.emit();
+};
+
+/* text readouts */
+function setupTable() {
+  const f = solve(state.x, state.y);
+  let h = '<table class="data"><tr><th>i</th><th>xᵢ</th><th>yᵢ</th><th>ŷᵢ = â + b̂·xᵢ</th><th>rᵢ = yᵢ − ŷᵢ</th></tr>';
+  for (let i = 0; i < 3; i++) h += `<tr><td>${i + 1}</td><td>${fmt(state.x[i], 1)}</td><td>${fmt(state.y[i], 1)}</td><td>${fmt(f.yhat[i])}</td><td>${fmt(f.r[i])}</td></tr>`;
+  h += `</table><p class="small mono">â = ${fmt(f.a)}, b̂ = ${fmt(f.b)} &nbsp;·&nbsp; RSS = ${fmt(dot(f.r, f.r))}</p>`;
+  $('setupTable').innerHTML = f.degenerate ? '<p class="warn">All x values are equal: the slope cannot be estimated. Spread them out.</p>' : h;
+}
+function readouts() {
+  const f = solve(state.x, state.y), xb = xbasis(state);
+  const xs = state.center ? '(x − x̄)' : 'x';
+  $('ro2').innerHTML = f.degenerate ? '' :
+    kv('residuals r', vfmt(f.r)) +
+    kv('sum of residuals', fmt(f.r[0] + f.r[1] + f.r[2])) +
+    kv('Σ rᵢ·xᵢ', fmt(dot(f.r, state.x)));
+  if (f.degenerate) { $('ro3').innerHTML = '<div class="warn">All x equal: 1 and x point the same way, so the plane collapses.</div>'; $('ro4').innerHTML = covHTML(state); return; }
+  const c = modelC(state), ru = dot(f.r, f.u);
+  const dist2 = dot(sub(state.y, c), sub(state.y, c));
+  $('ro3').innerHTML =
+    kv('fit ŷ', vfmt(f.yhat)) +
+    kv('residual r', `${vfmt(f.r)}<br>r·1 = ${fmt(dot(f.r, ONES))}, r·${xs} = ${fmt(dot(f.r, xb))}`) +
+    kv('RSS = ‖r‖² = (r·u)²', `${fmt(dot(f.r, f.r))} (r·u = ${fmt(ru)})`) +
+    kv('your model c: ‖y − c‖²', `${fmt(dist2)} ≥ RSS, with equality only when c = ŷ`);
+  const p = fitParams(state, state.y);
+  $('ro4').innerHTML = covHTML(state) + kv('your dataset\'s fit (â, b̂)', `(${fmt(p.a)}, ${fmt(p.b)})`);
+}
+
+function modeNote() {
+  const mode = state.cloudCenter, S = bootstrapSamples(state);
+  const stats = {
+    c: String.raw`Centered on the true \(\mathbf c\) with the true noise: this is the actual sampling distribution of \((\hat a, \hat b)\). Both contours should hug the dots.`,
+    fit: String.raw`Centered on your fit \(\hat{\mathbf y}\), with Gaussian noise of standard deviation \(\sigma\) (the slider stands in for \(\hat\sigma\)). The cloud has the same shape as the truth cloud, but the dots now center on your \((\hat a, \hat b)\), not on the truth.`,
+    resid: String.raw`Each resample is \(\hat{\mathbf y}\) plus the three residuals redrawn with replacement. The \(\sigma\) slider is ignored: the noise comes from the data. The residual vector always points along \(\mathbf u\) (for equally spaced \(x\) it is \((c, -2c, c)\)), so there are only a handful of different datasets, and the dots form a few clumps.`,
+    pairs: '',
+  };
+  let h = `<p><b>${MODES[mode]}.</b> ${stats[mode]}</p>`;
+  if (mode === 'pairs') {
+    const bad = S.filter((t) => !t.raw).length, perfect = S.filter((t) => t.raw && t.distinct === 2).length;
+    h = String.raw`<p><b>${MODES[mode]}.</b> Each resample draws 3 of your \((x, y)\) pairs with replacement, so it has its own \(x\) and its own plane. The \(\sigma\) slider is ignored. Of the ${S.length} resamples drawn here: <b>${bad}</b> had all \(x\) equal (the slope is undefined, so no dot) and <b>${perfect}</b> used only two distinct points (a perfect fit, zero residual). The remaining resamples use all three points again, which just reproduces your original fit. The 3-D cloud shows only the resampled \(\mathbf y\) vectors, at most 27 distinct points.</p>`;
+  }
+  setHTML($('modeNote'), h);
+}
+
+function histNote(st) {
+  if (!st) return '';
+  const mode = state.cloudCenter, n = st.zs.length;
+  const pct = (f) => Math.round((100 * st.zs.filter(f).length) / n);
+  if (mode === 'pairs') {
+    const zero = pct((z) => z < 1e-9);
+    return String.raw`<p><b>Pairs: RSS is not \(\chi^2\) at all.</b> Each resample is fit with its own \(x\), and when it contains only one or two distinct points the line passes through them exactly. <b>${zero}%</b> of the resamples have \(\mathrm{RSS} = 0\) exactly, and the rest sit at a single value (those just reorder your original points). With three observations and two parameters there is nothing left to resample. Only the leftover (1 df) quantity is defined here, since there is no shared plane.</p>`;
+  }
+  if (mode === 'resid') return String.raw`<p><b>Residual bootstrap: a few spikes, not a curve.</b> Every resample is built from the same residual vector, which points along \(\mathbf u\), so the squared length along \(\mathbf u\) can only take a handful of values. Scaled by \(\hat\sigma^2 = \mathrm{RSS}/(n-p)\) it is not a smooth \(\chi^2_1\), even though it has the right average. The \(\sigma\) slider is ignored.</p>`;
+  const what = mode === 'c'
+    ? String.raw`The histogram follows the curve because the noise really is Gaussian with this \(\sigma\) and the model really is \(\mathbf c\).`
+    : String.raw`The center does not matter for the leftover part: \(\mathbf u\) is perpendicular to the plane, so shifting the cloud within the plane leaves its distance along \(\mathbf u\) unchanged. Only \(\sigma\) matters, and the curve is the same as for the truth.`;
+  const extra = st.stat === 'tot' ? ' Total = absorbed + leftover, so the 3-df histogram is the sum of the other two.' : st.stat === 'abs' ? ' This part is what moves \\((\\hat a, \\hat b)\\): the in-plane noise.' : '';
+  return String.raw`<p>${what}${extra} If you use the wrong \(\sigma\) the whole histogram scales, whatever df you use.</p>`;
+}
+
+/** one-line reading of a tail probability, with a count from simulated repeats */
+function reading(k, z) {
+  const upper = chiSf(k, z), lower = 1 - upper, { count, n } = simTail(k, z);
+  const pct = (p) => fmt(p * 100, p < 0.1 ? 1 : 0) + '%';
+  const tail = `If the model were true, ${pct(upper)} of repeated experiments would give a value at least this large (simulated: ${count} of ${n}).`;
+  let tag;
+  if (upper < 0.01) tag = '<b style="color:var(--resid)">Far in the right tail.</b>';
+  else if (upper < 0.05) tag = '<b style="color:var(--resid)">Right tail.</b>';
+  else if (lower < 0.05) tag = '<b>Left tail: unusually small.</b>';
+  else if (upper < 0.1) tag = '<b>Borderline.</b>';
+  else tag = '<b style="color:var(--res-u)">Typical.</b>';
+  return `${tag} ${tail}`;
+}
+function fitSection() {
+  const f = solve(state.x, state.y), s2 = state.sigma * state.sigma;
+  if (f.degenerate) { ['v1', 'v2', 'v3'].forEach((id) => { $(id).innerHTML = ''; }); setHTML($('verdict'), '<p class="warn">All x values are equal, so there is no plane. Spread the x values out.</p>'); return; }
+  const c = modelC(state), tot = dot(sub(state.y, c), sub(state.y, c)), rss = dot(f.r, f.r), abs = Math.max(tot - rss, 0);
+  const z1 = rss / s2, z2 = abs / s2, z3 = tot / s2;
+  chi1(z1, 'RSS / σ²'); chi3(z3, '‖y − c‖² / σ²'); chi2(z2, '‖ŷ − c‖² / σ²');
+  $('v1').innerHTML = reading(1, z1);
+  $('v3').innerHTML = reading(3, z3);
+  $('v2').innerHTML = reading(2, z2);
+  const p1 = chiSf(1, z1), p2 = chiSf(2, z2), p3 = chiSf(3, z3);
+  const sg = fmt(state.sigma);
+  let v;
+  if (p1 < 0.05) v = String.raw`<p><b>The line family does not fit.</b> Even the best line leaves \(\mathrm{RSS}/\sigma^2 = ${fmt(z1)}\) (\(p = ${fmt(p1, 3)}\)). No choice of \((a, b)\) will look good at \(\sigma = ${sg}\): either the data are not linear, or the noise is bigger than assumed. Your own \((a, b)\) at \(${fmt(z3)}\) on \(\chi^2_3\) (\(p = ${fmt(p3, 3)}\)) cannot do better than the best line.</p>`;
+  else if (p2 < 0.05) v = String.raw`<p><b>The line family fits, but your \((a, b)\) is a poor choice.</b> The best line is typical (\(\mathrm{RSS}/\sigma^2 = ${fmt(z1)}\), \(p = ${fmt(p1, 3)}\)), but your model is \(${fmt(z2)}\) noise-units away from it inside the plane (\(p = ${fmt(p2, 3)}\) on \(\chi^2_2\)). Try "Set (a, b) to least squares".</p>`;
+  else v = String.raw`<p><b>Looks like a good choice.</b> The best line is consistent with the noise (\(\mathrm{RSS}/\sigma^2 = ${fmt(z1)}\), \(p = ${fmt(p1, 3)}\)), and your \((a, b)\) is within ordinary noise of it (\(${fmt(z2)}\) on \(\chi^2_2\), \(p = ${fmt(p2, 3)}\)), so the data cannot tell it apart from the best fit. Overall error \(${fmt(z3)}\) on \(\chi^2_3\) (\(p = ${fmt(p3, 3)}\)).</p>`;
+  setHTML($('verdict'), v);
+}
+
+function renderAll() {
+  refresh.forEach((r) => r());
+  setupTable(); readouts(); modeNote();
+  scatter(); model3d(); noise3d(); param(true);
+  scatter2(); fitSection();
+  const st = hist(stat);
+  setHTML($('histNote'), histNote(st));
+  [...$('dfSeg').children].forEach((b) => { b.classList.toggle('on', st && b.dataset.v === st.stat); b.classList.toggle('dis', state.cloudCenter === 'pairs' && b.dataset.v !== 'res'); });
+}
+state.on(renderAll);
+renderAll();
+typeset(document.body);
+
+</script>
+</body>
+</html>

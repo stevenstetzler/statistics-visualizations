@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Degrees of Freedom Geometry</title>
+<style>
+/*__CSS__*/
+</style>
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<script defer src="vendor/katex/katex.min.js"></script>
+<script defer src="vendor/katex/auto-render.min.js"></script>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/" } }
+</script>
+</head>
+<body class="explorer">
+<aside class="disclaimer" role="note">These are experimental learning materials generated with Claude code or another AI model. They are what I tried to get AI to teach me about, using a visualization to prove a point.</aside>
+<div id="app">
+  <main id="stage">
+    <div id="view"></div>
+    <div id="legend">
+      <div class="lg"><i style="background:var(--data)"></i>\(\ycol\) your data, one point in \(\mathbb R^3\)</div>
+      <div class="lg"><i style="background:var(--model)"></i><b>model plane</b> = every line \(a + b\,x\)</div>
+      <div class="lg"><i style="background:var(--fit)"></i>\(\yhcol\) closest point on the plane</div>
+      <div class="lg"><i style="background:var(--resid)"></i>\(\rcol = \mathbf y - \hat{\mathbf y}\) \(\perp\) plane (the 1-D residual space)</div>
+      <div class="lg"><i style="background:var(--cand)"></i>\(\ccol = a\mathbf 1 + b\mathbf x\) the model you chose</div>
+    </div>
+    <div id="hint">drag to rotate · scroll to zoom · right-drag to pan</div>
+  </main>
+  <aside id="side">
+    <h1>Data, model, residuals</h1>
+    <p class="small" style="margin:0 0 6px"><a href="tutorial.html" style="color:var(--fit)">Step-by-step tutorial →</a></p>
+    <p class="lede">Three observations are <em>one point</em> in \(\mathbb R^3\). A line \(y = a + b\,x\) can only reach a 2-D plane of that space. Fitting drops a perpendicular; what is left lives in the remaining <b>\(n - p = 1\)</b> direction.</p>
+
+    <section>
+      <h2>The usual picture</h2>
+      <svg id="scatter" viewBox="0 0 320 230" role="img" aria-label="Scatter plot of three points with a fitted line"></svg>
+      <p class="small">Drag a point up/down. <span class="sw" style="background:var(--fit)"></span>least-squares line, <span class="sw" style="background:var(--cand)"></span>your \((a, b)\) line. Shading: the blue band holds every line whose \((a, b)\) is inside the 95% parameter ellipse for the current \(\sigma\); the violet band is \(\pm\sigma\) of noise around your line.</p>
+    </section>
+
+    <section>
+      <h2>Controls</h2>
+      <div id="sliders"></div>
+      <div class="row">
+        <button id="snap">Set (a, b) to least squares</button>
+        <button id="reset">Reset</button>
+        <label class="chk"><input type="checkbox" id="center"> center x (use x − x̄)</label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Readout</h2>
+      <div id="readout"></div>
+    </section>
+
+    <section>
+      <h2>Where χ² comes from</h2>
+      <p class="small">Treat \(\mathbf c\) as the true model and add Gaussian noise \(\boldsymbol\varepsilon \sim \mathcal N(0, \sigma^2 I)\). Each dot in 3-D is a possible dataset \(\mathbf y = \mathbf c + \boldsymbol\varepsilon\).</p>
+      <div id="noiseSliders"><div class="small">Data noise</div></div>
+      <div class="row">
+        <button id="draw">Draw data from the model</button>
+        <label class="chk"><input type="checkbox" id="cloud" checked> noise cloud</label>
+      </div>
+      <div class="row">
+        <label for="ccenter">Cloud</label>
+        <select id="ccenter">
+          <option value="c">model c (hypothesized truth)</option>
+          <option value="fit">fit ŷ (parametric bootstrap)</option>
+          <option value="resid">fit ŷ + resampled residuals</option>
+          <option value="pairs">resampled (x, y) pairs</option>
+        </select>
+      </div>
+      <div class="row">
+        <label for="stat">Histogram of</label>
+        <select id="stat">
+          <option value="res">leftover noise ‖r‖² (1 df)</option>
+          <option value="abs">absorbed by fit ‖ŷ − c‖² (2 df)</option>
+          <option value="tot">total ‖ε‖² (3 df)</option>
+        </select>
+      </div>
+      <svg id="hist" viewBox="0 0 320 170" role="img" aria-label="Histogram of squared lengths versus chi-square density"></svg>
+      <p class="small">Bars: 4000 simulated datasets from the cloud chosen above. Curve: \(\chi^2\) density. For the data-driven clouds the scale is \(\hat\sigma^2 = \mathrm{RSS}/(n-p)\), so there is no marker. <span class="sw" style="background:var(--data)"></span>marker: your current y.</p>
+    </section>
+  </aside>
+</div>
+<script type="module">
+/*__JS__*/
+</script>
+</body>
+</html>

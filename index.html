@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Statistics Visualizations</title>
+<style>
+:root{--bg:#f6f7f9;--ink:#1c2230;--muted:#5b6475;--line:#dde1e8;--link:#1971c2}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#12151b;--ink:#e7eaf0;--muted:#98a2b3;--line:#2b3240;--link:#4dabf7}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:720px;margin:0 auto;padding:48px 20px 80px}
+h1{font-size:28px;margin:0 0 6px;letter-spacing:-.01em}
+.sub{color:var(--muted);margin:0 0 32px}
+ul{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+li{padding:18px 0;border-bottom:1px solid var(--line)}
+li b{font-size:18px}
+li a{color:var(--link)}
+.links{margin-left:6px;color:var(--muted)}
+li p{margin:6px 0 0;color:var(--muted)}
+.disclaimer{padding:8px 16px;font-size:13px;line-height:1.4;color:var(--muted);text-align:center;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--link) 7%,var(--bg))}
+</style>
+</head>
+<body>
+<aside class="disclaimer" role="note">These are experimental learning materials generated with Claude code or another AI model. They are what I tried to get AI to teach me about, using a visualization to prove a point.</aside>
+<main>
+<h1>Statistics Visualizations</h1>
+<p class="sub">Interactive explanations of statistical ideas.</p>
+<ul>
+  <li>
+    <b>Exploring Model Fit Degrees of Freedom</b> <span class="links">[<a href="dof/tutorial.html">tutorial</a>, <a href="dof/">viz</a>]</span>
+    <p>Why does fitting a line to three points leave only one degree of freedom? A 3D picture of data as a single point, the model as a plane, and the residual as the direction left over, followed by how noise in the data becomes χ² for the residual and a covariance ellipse for the fitted parameters.</p>
+  </li>
+  <li>
+    <b>Estimating Center and Spread</b> <span class="links">[<a href="center_and_spread/">viz</a>]</span>
+    <p>Mean and standard deviation, median and quantile-based estimators, sigma clipping, and inverse-variance weighting, each applied to a Gaussian sample salted with Cauchy outliers, with histograms of what each estimator sees and a repeated-trials comparison.</p>
+  </li>
+</ul>
+</main>
+</body>
+</html>

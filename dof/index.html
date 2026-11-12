@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Degrees of Freedom Geometry</title>
+<style>
+:root{
+  --bg:#f6f7f9; --panel:#ffffff; --ink:#1c2230; --muted:#5b6475; --line:#dde1e8;
+  --data:#e8590c; --fit:#1971c2; --resid:#e03131; --res-u:#2f9e44; --cand:#7048e8; --basis:#6b7280;
+  --stage:#fbfbfd;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#12151b; --panel:#1a1f28; --ink:#e7eaf0; --muted:#98a2b3; --line:#2b3240;
+    --data:#ff922b; --fit:#4dabf7; --resid:#ff6b6b; --res-u:#69db7c; --cand:#9775fa; --basis:#9aa3b2; --stage:#0e1117; }
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+#app{display:grid;grid-template-columns:1fr 380px;height:100vh}
+#stage{position:relative;overflow:hidden;background:var(--stage)}
+#view,#view canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;left:0;top:0;white-space:nowrap;font:600 12px/1 system-ui,sans-serif;transform:translate(8px,-50%);
+  text-shadow:0 0 3px var(--stage),0 0 3px var(--stage),0 0 3px var(--stage)}
+#legend{position:absolute;left:12px;top:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);
+  border-radius:8px;padding:8px 10px;font-size:12px;display:grid;gap:3px}
+.lg{display:flex;align-items:center;gap:7px}
+.lg i,.sw{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none}
+.sw{border-radius:2px;margin:0 3px 0 6px;vertical-align:-1px}
+#hint{position:absolute;left:12px;bottom:10px;color:var(--muted);font-size:12px}
+#side{overflow-y:auto;background:var(--panel);border-left:1px solid var(--line);padding:16px 18px 28px}
+h1{font-size:18px;margin:0 0 6px}
+h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+section{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.lede{color:var(--muted);margin:0}
+.small{color:var(--muted);font-size:12px;margin:6px 0 0}
+code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+svg{width:100%;height:auto;display:block;background:var(--bg);border-radius:8px;border:1px solid var(--line);touch-action:none}
+.sl{display:grid;grid-template-columns:34px 1fr 46px;align-items:center;gap:8px;margin:3px 0}
+.sl label{font-family:ui-monospace,monospace;font-size:12.5px}
+.sl output{font-family:ui-monospace,monospace;font-size:12.5px;text-align:right}
+.sl input{width:100%;accent-color:var(--fit)}
+.sl.grp{margin-top:10px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+button,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 10px;cursor:pointer}
+button:hover{border-color:var(--fit)}
+.chk{display:flex;align-items:center;gap:5px;cursor:pointer}
+#readout{display:grid;gap:6px}
+.kv{display:grid;grid-template-columns:1fr;gap:1px;padding:6px 8px;border-radius:6px;background:var(--bg)}
+.kv .k{color:var(--muted);font-size:12px}
+.kv .v{font-family:ui-monospace,monospace;font-size:12.5px}
+.warn{color:var(--resid);font-size:12px}
+@media (max-width:900px){
+  #app{grid-template-columns:1fr;grid-template-rows:60vh auto;height:auto}
+  #stage{height:60vh}
+  #side{border-left:0;border-top:1px solid var(--line)}
+  #legend{display:none}
+}
+
+/* math (KaTeX) */
+.katex{font-size:1.05em}
+.katex svg{background:none;border:0;border-radius:0;height:inherit;display:block;touch-action:auto}
+.m-data{color:var(--data)}.m-fit{color:var(--fit)}.m-cand{color:var(--cand)}.m-resid{color:var(--resid)}.m-u{color:var(--res-u)}
+.kv .v .katex{font-size:1em}
+.card h3 .katex,h2 .katex{text-transform:none}
+
+/* disclaimer banner */
+.disclaimer{padding:8px 16px;font-size:13px;line-height:1.4;color:var(--muted);text-align:center;
+  background:color-mix(in srgb,var(--cand) 8%,var(--panel));border-bottom:1px solid var(--line)}
+body.explorer{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+body.explorer #app{flex:1;min-height:0;height:auto;grid-template-rows:minmax(0,1fr)}
+@media (max-width:900px){body.explorer{display:block;height:auto;overflow:visible}body.explorer #app{height:auto;grid-template-rows:60vh auto}}
+
+</style>
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<script defer src="vendor/katex/katex.min.js"></script>
+<script defer src="vendor/katex/auto-render.min.js"></script>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/" } }
+</script>
+</head>
+<body class="explorer">
+<aside class="disclaimer" role="note">These are experimental learning materials generated with Claude code or another AI model. They are what I tried to get AI to teach me about, using a visualization to prove a point.</aside>
+<div id="app">
+  <main id="stage">
+    <div id="view"></div>
+    <div id="legend">
+      <div class="lg"><i style="background:var(--data)"></i>\(\ycol\) your data, one point in \(\mathbb R^3\)</div>
+      <div class="lg"><i style="background:var(--model)"></i><b>model plane</b> = every line \(a + b\,x\)</div>
+      <div class="lg"><i style="background:var(--fit)"></i>\(\yhcol\) closest point on the plane</div>
+      <div class="lg"><i style="background:var(--resid)"></i>\(\rcol = \mathbf y - \hat{\mathbf y}\) \(\perp\) plane (the 1-D residual space)</div>
+      <div class="lg"><i style="background:var(--cand)"></i>\(\ccol = a\mathbf 1 + b\mathbf x\) the model you chose</div>
+    </div>
+    <div id="hint">drag to rotate · scroll to zoom · right-drag to pan</div>
+  </main>
+  <aside id="side">
+    <h1>Data, model, residuals</h1>
+    <p class="small" style="margin:0 0 6px"><a href="tutorial.html" style="color:var(--fit)">Step-by-step tutorial →</a></p>
+    <p class="lede">Three observations are <em>one point</em> in \(\mathbb R^3\). A line \(y = a + b\,x\) can only reach a 2-D plane of that space. Fitting drops a perpendicular; what is left lives in the remaining <b>\(n - p = 1\)</b> direction.</p>
+
+    <section>
+      <h2>The usual picture</h2>
+      <svg id="scatter" viewBox="0 0 320 230" role="img" aria-label="Scatter plot of three points with a fitted line"></svg>
+      <p class="small">Drag a point up/down. <span class="sw" style="background:var(--fit)"></span>least-squares line, <span class="sw" style="background:var(--cand)"></span>your \((a, b)\) line. Shading: the blue band holds every line whose \((a, b)\) is inside the 95% parameter ellipse for the current \(\sigma\); the violet band is \(\pm\sigma\) of noise around your line.</p>
+    </section>
+
+    <section>
+      <h2>Controls</h2>
+      <div id="sliders"></div>
+      <div class="row">
+        <button id="snap">Set (a, b) to least squares</button>
+        <button id="reset">Reset</button>
+        <label class="chk"><input type="checkbox" id="center"> center x (use x − x̄)</label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Readout</h2>
+      <div id="readout"></div>
+    </section>
+
+    <section>
+      <h2>Where χ² comes from</h2>
+      <p class="small">Treat \(\mathbf c\) as the true model and add Gaussian noise \(\boldsymbol\varepsilon \sim \mathcal N(0, \sigma^2 I)\). Each dot in 3-D is a possible dataset \(\mathbf y = \mathbf c + \boldsymbol\varepsilon\).</p>
+      <div id="noiseSliders"><div class="small">Data noise</div></div>
+      <div class="row">
+        <button id="draw">Draw data from the model</button>
+        <label class="chk"><input type="checkbox" id="cloud" checked> noise cloud</label>
+      </div>
+      <div class="row">
+        <label for="ccenter">Cloud</label>
+        <select id="ccenter">
+          <option value="c">model c (hypothesized truth)</option>
+          <option value="fit">fit ŷ (parametric bootstrap)</option>
+          <option value="resid">fit ŷ + resampled residuals</option>
+          <option value="pairs">resampled (x, y) pairs</option>
+        </select>
+      </div>
+      <div class="row">
+        <label for="stat">Histogram of</label>
+        <select id="stat">
+          <option value="res">leftover noise ‖r‖² (1 df)</option>
+          <option value="abs">absorbed by fit ‖ŷ − c‖² (2 df)</option>
+          <option value="tot">total ‖ε‖² (3 df)</option>
+        </select>
+      </div>
+      <svg id="hist" viewBox="0 0 320 170" role="img" aria-label="Histogram of squared lengths versus chi-square density"></svg>
+      <p class="small">Bars: 4000 simulated datasets from the cloud chosen above. Curve: \(\chi^2\) density. For the data-driven clouds the scale is \(\hat\sigma^2 = \mathrm{RSS}/(n-p)\), so there is no marker. <span class="sw" style="background:var(--data)"></span>marker: your current y.</p>
+    </section>
+  </aside>
+</div>
+<script type="module">
+/* Explorer page: everything in one view. Shared pieces live in lib.js. */
+import {
+  createState, setHTML, typeset, createScatter, createModelView, createHistView, buildSliders, xSliders, ySliders, abSliders, sigmaSlider,
+  solve, fitParams, setCenter, modelC, xbasis, xbar, dot, add, sub, scale, gauss, fmt, vfmt, clamp, colors, ONES,
+} from './lib.js';
+
+const DEFAULTS = { x: [0, 1, 2], y: [1, 2.6, 3], a: 0.5, b: 1.2, sigma: 1, center: false, cloudCenter: 'c', showCloud: true };
+const state = createState(DEFAULTS);
+const $ = (id) => document.getElementById(id);
+const col = colors();
+
+/* ------------------------------------------------------------- sliders */
+const heading = (host, text) => { const h = document.createElement('div'); h.className = 'small'; h.style.marginTop = '10px'; h.textContent = text; host.appendChild(h); return h; };
+const sliderHost = $('sliders');
+heading(sliderHost, 'Predictor values');
+const refreshX = buildSliders(sliderHost, xSliders(), state);
+heading(sliderHost, 'Observed values');
+const refreshY = buildSliders(sliderHost, ySliders(), state);
+const modelHead = heading(sliderHost, '');
+const refreshAB = buildSliders(sliderHost, abSliders(), state);
+const refreshSigma = buildSliders($('noiseSliders'), [sigmaSlider()], state);
+
+/* --------------------------------------------------------------- views */
+const scatter = createScatter($('scatter'), state, { draggable: true, showCand: true, showFit: true, bands: true });
+const model = createModelView($('view'), state, { cloud: true, fits: false, epsilon: true });
+
+/* ------------------------------------------------------------- buttons */
+$('snap').onclick = () => { const p = fitParams(state, state.y); state.a = clamp(p.a, -8, 8); state.b = clamp(p.b, -3, 3); state.emit(); };
+$('reset').onclick = () => {
+  setCenter(state, false); $('center').checked = false;
+  state.x = [...DEFAULTS.x]; state.y = [...DEFAULTS.y]; state.a = DEFAULTS.a; state.b = DEFAULTS.b; state.sigma = DEFAULTS.sigma;
+  state.emit();
+};
+$('center').onchange = (e) => { setCenter(state, e.target.checked); state.emit(); };
+$('cloud').onchange = (e) => { state.showCloud = e.target.checked; state.emit(); };
+$('ccenter').onchange = (e) => { state.cloudCenter = e.target.value; state.emit(); };
+$('stat').onchange = () => state.emit();
+$('draw').onclick = () => {
+  const e = [gauss(), gauss(), gauss()];
+  state.y = add(modelC(state), scale(e, state.sigma)).map((v) => clamp(Math.round(v * 20) / 20, -5.5, 5.5));
+  state.emit();
+};
+
+const hist = createHistView($('hist'), state);
+
+/* ------------------------------------------------------------- readout */
+function drawReadout(f) {
+  const { x, y, sigma, center } = state;
+  const xb = xbasis(state);
+  const xv = center ? String.raw`\mathbf x - \bar x\mathbf 1` : String.raw`\mathbf x`;   // second spanning vector
+  const xs = center ? String.raw`(x - \bar x)` : 'x';
+  const xp = center ? String.raw`(\mathbf x - \bar x\mathbf 1)` : String.raw`\mathbf x`;   // same, parenthesised when it follows a scalar
+  const host = $('readout');
+  if (f.degenerate) {
+    setHTML(host, String.raw`<div class="warn">All \(x\) values are equal, so \(\mathbf 1\) and \(\mathbf x\) point the same way: the "plane" collapses to a line and the model has only \(p = 1\) free parameter. Spread the \(x\) values out to see the plane.</div>`);
+    return;
+  }
+  const { r, u, yhat } = f;
+  const c = modelC(state);
+  const e = scale(sub(y, c), 1 / sigma);
+  const tot = dot(e, e), resid = dot(e, u) ** 2, absorbed = tot - resid;
+  const cosT = dot(ONES, xb) / (Math.sqrt(3) * Math.hypot(...xb)), ang = Math.acos(clamp(cosT, -1, 1)) * 180 / Math.PI;
+  const kv = (k, v) => `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+  const level = fmt(center ? f.a + f.b * xbar(x) : f.a), slope = `${f.b < 0 ? '-' : '+'} ${fmt(Math.abs(f.b))}`;
+  setHTML(host,
+    kv(String.raw`angle between \(\mathbf 1\) and \(${xv}\)`, String.raw`${fmt(ang, 1)}°  ${Math.abs(ang - 90) < 0.05 ? '(perpendicular)' : String.raw`(oblique: \(\cos\theta = ${fmt(cosT, 3)}\))`}`) +
+    kv('least-squares fit', String.raw`\(\hat y = ${level} ${slope}\,${xs}\)`) +
+    kv(String.raw`fitted vector \(\hat{\mathbf y} = \hat a\mathbf 1 + \hat b\,${xp}\)`, vfmt(yhat)) +
+    kv(String.raw`residual vector \(\mathbf r = \mathbf y - \hat{\mathbf y}\)`, vfmt(r)) +
+    kv('perpendicular to both spanning vectors', String.raw`\(\mathbf r\cdot\mathbf 1 = ${fmt(dot(r, ONES))}\)  (residuals sum to 0)<br>\(\mathbf r\cdot${xp} = ${fmt(dot(r, xb))}\)  (uncorrelated with \(x\))`) +
+    kv('the single free residual direction', String.raw`\(\mathbf u =\) ${vfmt(u)}<br>\(\mathbf r = (\mathbf r\cdot\mathbf u)\,\mathbf u\), with \(\mathbf r\cdot\mathbf u = ${fmt(dot(r, u))}\)<br>\(\lVert\mathbf r\rVert^2 = \mathrm{RSS} = ${fmt(dot(r, r))} = (\mathbf r\cdot\mathbf u)^2\)`) +
+    kv(String.raw`treat \(\mathbf c\) as the truth, \(\boldsymbol\varepsilon = \mathbf y - \mathbf c\)  (\(\sigma = ${fmt(sigma)}\))`, String.raw`\(\lVert\boldsymbol\varepsilon\rVert^2/\sigma^2 = ${fmt(tot)}\) = <b style="color:${col.fit}">${fmt(absorbed)}</b> absorbed (2 df) + <b style="color:${col.resid}">${fmt(resid)}</b> left over (1 df)`) +
+    kv(String.raw`\(\mathrm{RSS}/\sigma^2\), df \(= n - p = 1\)`, String.raw`\(${fmt(resid)} \sim \chi^2_1\) if the model is right`) +
+    kv('estimated vs true noise', String.raw`\(\hat\sigma^2 = \mathrm{RSS}/(n-p) = ${fmt(dot(r, r))}\)<br>true \(\sigma^2 = ${fmt(sigma * sigma)}\)`));
+}
+
+/* -------------------------------------------------------------- render */
+function renderAll() {
+  const f = solve(state.x, state.y);
+  setHTML(modelHead, state.center ? String.raw`Your model \(y = a + b\,(x - \bar x)\)` : String.raw`Your model \(y = a + b\,x\)`);
+  refreshX(); refreshY(); refreshAB(); refreshSigma();
+  scatter(); model(); drawReadout(f); hist($('stat').value);
+}
+state.on(renderAll);
+renderAll();
+typeset(document.body);
+
+</script>
+</body>
+</html>
