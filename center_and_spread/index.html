@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Center and Spread</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="../dof/vendor/katex/katex.min.css">
+<script defer src="../dof/vendor/katex/katex.min.js"></script>
+<script defer src="../dof/vendor/katex/auto-render.min.js"></script>
+</head>
+<body>
+<aside class="disclaimer" role="note">These are experimental learning materials generated with Claude code or another AI model. They are what I tried to get AI to teach me about, using a visualization to prove a point.</aside>
+<main>
+<nav class="top"><a href="../index.html">← Statistics visualizations</a></nav>
+<h1 class="title">Estimating the Center and Spread of a Distribution</h1>
+<p class="lead">Given a pile of numbers, “where is the middle?” and “how wide is it?” sound like they have one answer. They don’t: there are several estimators, and they disagree the moment the data are contaminated. This page runs four families of estimators on the same noisy sample and shows what each one sees.</p>
+
+<h2>The data</h2>
+<p>Most samples come from a Gaussian with mean \(\mu = 5\) and standard deviation \(\sigma = 1.5\). A fraction \(f\) are replaced by draws from a Cauchy distribution with the <em>same center</em> \(x_0 = 5\) and scale \(\gamma\):</p>
+$$x_i \sim (1-f)\,\mathcal N(5,\,1.5^2) \;+\; f\,\mathrm{Cauchy}(5,\,\gamma).$$
+<p>The Cauchy has no finite mean or variance: its tails are so heavy that a few samples land dozens of σ away. The goal for every estimator below is the same: recover <b>center = 5</b> and <b>spread = 1.5</b> of the Gaussian part, without being told which samples are contaminated.</p>
+
+<div id="global" role="group" aria-label="Sample controls">
+  <div class="ctl"><b>N</b><input id="gN" type="range" min="20" max="2000" step="10" value="300"><output id="oN"></output></div>
+  <div class="ctl"><b>outliers f</b><input id="gF" type="range" min="0" max="0.3" step="0.005" value="0.08"><output id="oF"></output></div>
+  <div class="ctl"><b>Cauchy γ</b><input id="gG" type="range" min="0.1" max="5" step="0.1" value="1.5"><output id="oG"></output></div>
+  <div class="ctl"><b>window</b><select id="gW"><option value="5">5 ± 5</option><option value="10" selected>5 ± 10</option><option value="25">5 ± 25</option><option value="100">5 ± 100</option></select><span></span></div>
+  <div class="opts" style="margin:0"><button id="gNew">New sample</button>
+    <label class="chk"><input type="checkbox" id="gReveal" checked> colour outliers</label>
+    <label class="chk"><input type="checkbox" id="gTruth" checked> true curve</label></div>
+</div>
+
+<div class="card">
+  <h3>The sample, histogrammed</h3>
+  <svg class="chart" id="h0" role="img" aria-label="Histogram of the sample"></svg>
+  <div class="legend" id="l0"></div>
+  <p class="small" style="margin:8px 0 0">Blue: samples from the Gaussian. Orange: contaminants. (You normally can’t see this colouring; it is revealed here so you can judge the estimators. Untick “colour outliers” to see what the data really look like.) Samples outside the window are counted at the edges.</p>
+</div>
+
+<h2><span class="n">1</span>Mean and standard deviation</h2>
+<p>The textbook pair is the sample mean and sample standard deviation:</p>
+$$\bar x = \frac1N\sum_i x_i,\qquad s = \sqrt{\frac{1}{N-1}\sum_i (x_i-\bar x)^2}.$$
+<p>They are the maximum-likelihood estimates for Gaussian data and, when the data <em>are</em> Gaussian, no estimator beats them. But both are built from sums of the raw values, and squares in the case of \(s\), so a single point that is far away has unbounded influence. A single sample at \(x = 5 + 100\) moves \(\bar x\) by \(100/N\) and adds \(100^2/N\) to the variance.</p>
+<div class="card">
+  <h3>Mean ± standard deviation</h3>
+  <svg class="chart" id="h1" role="img" aria-label="Histogram with the mean and standard deviation"></svg>
+  <div class="legend" id="l1"></div><div id="r1"></div>
+</div>
+<div class="callout"><p>Increase <b>f</b> a little. The mean drifts, and the standard deviation explodes: with the Cauchy contaminants it estimates the width of the <em>outliers</em>, not of the bulk. Because the Cauchy has infinite variance, \(s\) does not even converge as \(N\) grows. Press “New sample” a few times to see how erratic it is.</p></div>
+
+<h2><span class="n">2</span>Median and quantile-based estimators</h2>
+<p>Replace sums by <em>ranks</em>. The <b>median</b> is the 50% quantile; it only cares which side of it a point is on, so moving an outlier further out changes nothing. Spread can be read from quantiles too. For a Gaussian, the quartiles sit at \(\mu\pm0.6745\,\sigma\), so</p>
+$$\begin{aligned}\hat\sigma_{\rm IQR} &= \frac{Q_3-Q_1}{1.349},\\
+\hat\sigma_{\rm MAD} &= 1.4826\;\mathrm{median}\,\lvert x_i-\mathrm{median}(x)\rvert,\\
+\hat\sigma_{16\text{–}84} &= \frac{Q_{84.1}-Q_{15.9}}{2}.\end{aligned}$$
+<p>The constants rescale each quantity so that it equals \(\sigma\) for Gaussian data. Between the mean and the median lies the <b>trimmed mean</b>: discard the lowest and highest fraction \(\alpha\) of the sorted data and average the rest (\(\alpha=0\) is the mean, \(\alpha\to 0.5\) is the median).</p>
+<div class="card">
+  <h3>Median ± quantile-based spread</h3>
+  <div class="opts"><span class="lab">spread:</span>
+    <label class="chk"><input type="radio" name="s2" value="mad" checked> MAD</label>
+    <label class="chk"><input type="radio" name="s2" value="iqr"> IQR</label>
+    <label class="chk"><input type="radio" name="s2" value="pct"> 16–84%</label>
+    <span class="lab" style="margin-left:14px">trim α:</span><input id="trim" type="range" min="0" max="0.45" step="0.01" value="0.2"><output id="otrim" class="small"></output></div>
+  <svg class="chart" id="h2" role="img" aria-label="Histogram with the median and quantile-based spread"></svg>
+  <div class="legend" id="l2"></div><div id="r2"></div>
+</div>
+<div class="callout"><p>The price: when the data are perfectly Gaussian (\(f=0\)) the median is about 25% noisier than the mean (its standard error is \(\sqrt{\pi/2}\,\sigma/\sqrt N\)) and the MAD is noisier than \(s\). You pay a little efficiency for a lot of insurance. The box above the histogram is the usual box-plot: \(Q_1\), median, \(Q_3\).</p></div>
+
+<h2><span class="n">3</span>Sigma clipping</h2>
+<p>A compromise that keeps the familiar mean and \(s\): estimate, throw away points more than \(k\) standard deviations from the center, and repeat until nothing more is removed.</p>
+$$\text{keep } x_i \text{ if } \lvert x_i - c\rvert \le k\,\hat\sigma,\qquad c,\hat\sigma \text{ recomputed from the kept set each pass.}$$
+<p>The first pass is hamstrung because outliers inflate \(\hat\sigma\) (so the cut is too loose), but it removes the worst offenders, which shrinks \(\hat\sigma\) and tightens the next cut. Scrub through the passes below. The center \(c\) and scale \(\hat\sigma\) used for the cut can themselves be robust (median, MAD), in which case it converges almost immediately.</p>
+<div class="card">
+  <h3>Iterative sigma clipping</h3>
+  <div class="opts">
+    <span class="lab">k</span><input id="ck" type="range" min="1" max="5" step="0.1" value="3"><output id="ock" class="small"></output>
+    <span class="lab">center</span>
+    <label class="chk"><input type="radio" name="cc" value="mean" checked> mean</label>
+    <label class="chk"><input type="radio" name="cc" value="median"> median</label>
+    <span class="lab">scale</span>
+    <label class="chk"><input type="radio" name="cd" value="std" checked> std</label>
+    <label class="chk"><input type="radio" name="cd" value="mad"> MAD</label>
+    <span class="lab">max passes</span><input id="cm" type="range" min="1" max="15" step="1" value="10"><output id="ocm" class="small"></output>
+  </div>
+  <div class="opts"><span class="lab">pass shown</span><input id="cs" type="range" min="0" max="0" step="1" value="0" style="width:200px"><output id="ocs" class="small"></output>
+    <label class="chk"><input type="checkbox" id="ccor" checked> correct the std for truncation</label></div>
+  <svg class="chart" id="h3" role="img" aria-label="Histogram with sigma-clipped samples greyed out"></svg>
+  <div class="legend" id="l3"></div><div id="r3"></div>
+</div>
+<div class="callout"><p><b>Truncation bias.</b> Clipping at \(\pm k\sigma\) also trims the genuine Gaussian tails, so the std of what is left is a little too small: by a factor 0.987 at \(k=3\), but 0.88 at \(k=2\). The tick box divides it back out using the truncated-normal variance \(1-2k\varphi(k)/(2\Phi(k)-1)\). Try \(k=1\): clipping with a tight cut “converges” to the wrong answer, and keeps eating Gaussian samples.</p></div>
+
+<h2><span class="n">4</span>Weighted means and standard deviations</h2>
+<p>Now suppose each measurement \(x_i\) comes with its own error bar \(\sigma_i\) (instruments differ, exposures differ). All samples measure the same true value 5, but the typical error bar is around 1.5 and varies several-fold between samples. Precise points should count for more. Weight by inverse variance, \(w_i = 1/\sigma_i^2\):</p>
+$$\mu_w = \frac{\sum_i w_i x_i}{\sum_i w_i},\qquad
+\sigma_{\mu_w} = \frac{1}{\sqrt{\sum_i w_i}},\qquad
+s_w^2 = \frac{\sum_i w_i (x_i-\mu_w)^2}{\sum_i w_i - \sum_i w_i^2/\sum_i w_i}.$$
+<p>\(\sigma_{\mu_w}\) is the <em>formal</em> uncertainty of the weighted mean, and \(s_w\) is the weighted scatter. If the error bars are honest and there is no extra scatter, \(s_w\) should match \(\sqrt{N/\sum w_i}\) and \(\chi^2_\nu=\sum w_i(x_i-\mu_w)^2/(N-1)\approx 1\). A \(\chi^2_\nu\) far above 1 tells you the error bars are lying, which is exactly what contamination does.</p>
+<div class="card">
+  <h3>Inverse-variance weighted mean</h3>
+  <div class="opts">
+    <label class="chk"><input type="checkbox" id="wh"> contaminated points admit it (their error bar grows to the size of their miss)</label>
+    <label class="chk"><input type="checkbox" id="wc"> clip points more than k of their <em>own</em> error bars away, k =</label>
+    <input id="wk" type="range" min="1" max="5" step="0.1" value="3" style="width:110px"><output id="owk" class="small"></output>
+  </div>
+  <svg class="chart" id="h4" role="img" aria-label="Unweighted and weighted histogram"></svg>
+  <div class="legend" id="l4"></div>
+  <svg class="chart" id="h4b" role="img" aria-label="First 40 measurements with error bars" style="margin-top:10px"></svg>
+  <div class="legend" id="l4b"></div><div id="r4"></div>
+</div>
+<div class="callout"><p>Weights only help if the error bars are true. With honest bars the weighted mean is the best unbiased linear estimator, tighter than the plain mean, and the contaminants are automatically down-weighted. If a contaminated point still claims a small error bar (the default), it gets a <em>large</em> weight and wrecks the mean; \(\chi^2_\nu\) then flags it. Clipping in units of each point’s own error bar is the fix.</p></div>
+
+<h2><span class="n">5</span>Which one should I use?</h2>
+<p>Everything above is one random sample. To compare estimators fairly, repeat the experiment many times at each contamination level, using the settings for \(N\) and \(\gamma\) from the controls at the top. The curves show the typical absolute error of each estimate (lower is better).</p>
+<div class="card">
+  <div class="opts"><span class="lab">show</span>
+    <label class="chk"><input type="radio" name="sm" value="med" checked> typical error (median of trials)</label>
+    <label class="chk"><input type="radio" name="sm" value="p90"> bad-day error (90th percentile)</label>
+    <button id="simGo">Re-run</button><span class="small" id="simInfo"></span></div>
+  <div class="two"><div><h3 style="margin:0 0 4px;font-size:12px;color:var(--muted)">CENTER: |estimate − 5|</h3><svg class="chart" id="s1"></svg></div>
+  <div><h3 style="margin:0 0 4px;font-size:12px;color:var(--muted)">SPREAD: |estimate − 1.5|</h3><svg class="chart" id="s2"></svg></div></div>
+  <div class="legend" id="ls"></div>
+</div>
+<ul>
+<li><b>Clean, Gaussian data:</b> mean and std are best; everything else is slightly noisier.</li>
+<li><b>A few outliers:</b> the center is easy to protect (median, trimmed mean, clipping all work); the spread is where mean/std fails first and worst.</li>
+<li><b>Heavier contamination (to 25% here):</b> median/MAD and both clipping variants stay close to the truth while mean/std keeps getting worse. Raise γ or N at the top and re-run to see how the gaps change.</li>
+<li><b>Known per-point errors:</b> use them, but check \(\chi^2_\nu\) and clip against each point’s own error bar.</li>
+</ul>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>
