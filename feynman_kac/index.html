@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feynman–Kac: Monte Carlo</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="../dof/vendor/katex/katex.min.css">
+<script defer src="../dof/vendor/katex/katex.min.js"></script>
+<script defer src="../dof/vendor/katex/auto-render.min.js"></script>
+</head>
+<body>
+<aside class="disclaimer" role="note">These are experimental learning materials generated with Claude code or another AI model. They are what I tried to get AI to teach me about, using a visualization to prove a point.</aside>
+<main>
+<nav class="top"><a href="../index.html">← Statistics visualizations</a></nav>
+<h1 class="title">Feynman–Kac by Monte Carlo</h1>
+<p class="lead">The <a href="https://en.wikipedia.org/wiki/Feynman%E2%80%93Kac_formula" target="_blank" rel="noopener">Feynman–Kac formula</a> says a PDE's solution equals the expected value of a cost racked up by a randomly-wandering particle. That's an invitation to solve the PDE by simulation instead of algebra: throw a swarm of random particles at it and average. This page does exactly that, live in the browser, and shows how cheap it is.</p>
+
+<h2><span class="n">1</span>The setup</h2>
+<p>Take the worked example from the Wikipedia article: the convection–diffusion equation</p>
+$$\frac{\partial u}{\partial t} + \frac{\partial u}{\partial x} = -\frac{\partial^2 u}{\partial x^2},\qquad u(x,1) = e^{-x^2}.$$
+<p>has the closed-form solution \(u(x,t) = (5-4t)^{-1/2}\exp\!\big(-(1-t+x)^2/(5-4t)\big)\). Feynman–Kac says the same \(u(x,t)\) is also</p>
+$$u(x,t) = \mathbb E\big[e^{-X_T^2} \,\big|\, X_t = x\big],\qquad dX_t = dt + \sqrt 2\,dW_t,\quad T=1,$$
+<p>i.e.: start a particle at \((x,t)\), let it jitter forward under this specific drift-plus-noise rule until time \(T=1\), score it by \(e^{-X_T^2}\) wherever it lands, and average that score over many independent particles. That average <em>is</em> \(u(x,t)\) — no PDE solver required.</p>
+
+<div id="global" role="group" aria-label="Simulation controls">
+  <div class="ctl"><b>x₀</b><input id="gX" type="range" min="-3" max="3" step="0.1" value="0"><output id="oX"></output></div>
+  <div class="ctl"><b>t₀</b><input id="gT" type="range" min="0" max="0.9" step="0.01" value="0"><output id="oT"></output></div>
+  <div class="ctl"><b>paths N</b><input id="gN" type="range" min="50" max="20000" step="50" value="4000"><output id="oN"></output></div>
+  <div class="ctl"><b>step size Δt</b><input id="gDt" type="range" min="0.002" max="0.05" step="0.001" value="0.01"><output id="oDt"></output></div>
+  <div class="opts" style="margin:0"><button id="gNew">New random seed</button></div>
+</div>
+
+<h2><span class="n">2</span>The particle swarm</h2>
+<p>Each thin line below is one simulated path \(X_s\) for \(s\in[t_0,1]\), stepped forward with the <a href="https://en.wikipedia.org/wiki/Euler%E2%80%93Maruyama_method" target="_blank" rel="noopener">Euler–Maruyama method</a>: \(X_{s+\Delta t} = X_s + \mu\,\Delta t + \sigma\sqrt{\Delta t}\,Z\) for a fresh standard-normal draw \(Z\) at every step. The drift \(\mu=1\) pushes every path to the right; the noise \(\sigma=\sqrt2\) fans them out.</p>
+<div class="card">
+  <h3>Sample paths from \((x_0, t_0)\) to \(T=1\)</h3>
+  <svg class="chart" id="hPaths" role="img" aria-label="Simulated particle paths"></svg>
+  <div class="legend" id="lPaths"></div>
+</div>
+
+<h2><span class="n">3</span>Where they land, and what that's worth</h2>
+<p>At \(T=1\) every path has some endpoint \(X_T\). The histogram shows where they landed; overlaid is the payoff \(e^{-X_T^2}\) each endpoint earns (bright center, fading tails — far-out endpoints are worth almost nothing).</p>
+<div class="card">
+  <h3>Endpoint distribution and payoff</h3>
+  <svg class="chart" id="hEnd" role="img" aria-label="Histogram of simulated endpoints with payoff overlay"></svg>
+  <div class="legend" id="lEnd"></div>
+</div>
+
+<h2><span class="n">4</span>Averaging converges — and it's cheap</h2>
+<p>The Feynman–Kac estimate is just the running average of the payoff over paths simulated so far. By the <a href="https://en.wikipedia.org/wiki/Central_limit_theorem" target="_blank" rel="noopener">central limit theorem</a> its standard error shrinks like \(1/\sqrt N\), so the band below narrows as more paths are thrown in, converging on the dashed exact value. The timing line underneath is the actual wall-clock cost of the whole simulation on this page, in your browser, right now.</p>
+<div class="card">
+  <h3>Monte Carlo estimate of u(x₀, t₀) vs. number of paths</h3>
+  <svg class="chart" id="hConv" role="img" aria-label="Convergence of the Monte Carlo estimate"></svg>
+  <div class="legend" id="lConv"></div>
+  <div id="rConv"></div>
+</div>
+<div class="callout"><p>Drag <b>N</b> up to its max (20,000 paths × up to ~450 steps each) and watch the timing line. On ordinary hardware this stays well under a tenth of a second — the simulation is a few hundred thousand multiply-adds, and every path is independent, so there's nothing to parallelize or optimize beyond what a single <code>for</code> loop already does. The expensive regime for Monte Carlo methods is high-dimensional state or extremely fine time steps, neither of which this toy problem needs.</p></div>
+
+<h2><span class="n">5</span>Why this works</h2>
+<p>This isn't a coincidence or an approximation trick bolted onto the PDE — it's the content of the theorem. Feynman–Kac proves that <em>any</em> solution of a PDE of this form equals an expectation over paths of the matching stochastic differential equation. So simulating particles isn't a heuristic stand-in for solving the PDE: it's a different, valid way of computing the exact same number, at a cost that scales with how precisely you want the answer rather than with how hard the PDE is to discretize. That's why Monte Carlo methods are the tool of choice for Feynman–Kac problems in high dimensions — pricing options on baskets of dozens of correlated stocks, say — where a grid-based PDE solver would need a grid with astronomically many cells, but simulating one more random path costs exactly as much as it always did.</p>
+
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>
