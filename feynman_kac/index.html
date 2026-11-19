@@ -3,62 +3,173 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Feynman–Kac: Monte Carlo</title>
+<title>Feynman–Kac Explainer</title>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="../dof/vendor/katex/katex.min.css">
 <script defer src="../dof/vendor/katex/katex.min.js"></script>
 <script defer src="../dof/vendor/katex/auto-render.min.js"></script>
+<style>
+.two-col{display:grid;grid-template-columns:1fr 2fr;gap:14px;align-items:start}
+.two-col svg{width:100%}
+@media (max-width:640px){.two-col{grid-template-columns:1fr}}
+.meter{height:14px;border-radius:7px;background:var(--line);overflow:hidden;margin:4px 0}
+.meter i{display:block;height:100%;border-radius:7px}
+.meters{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;font-size:13px;max-width:420px;margin:10px 0}
+.pseudo{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--stage);border:1px solid var(--line);border-radius:8px;padding:10px 14px;overflow-x:auto;margin:10px 0}
+.pseudo b{font-weight:700}
+.legend-terms{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;margin:8px 0}
+</style>
 </head>
 <body>
 <aside class="disclaimer" role="note">These are experimental learning materials generated with Claude code or another AI model. They are what I tried to get AI to teach me about, using a visualization to prove a point.</aside>
 <main>
 <nav class="top"><a href="../index.html">← Statistics visualizations</a></nav>
-<h1 class="title">Feynman–Kac by Monte Carlo</h1>
-<p class="lead">The <a href="https://en.wikipedia.org/wiki/Feynman%E2%80%93Kac_formula" target="_blank" rel="noopener">Feynman–Kac formula</a> says a PDE's solution equals the expected value of a cost racked up by a randomly-wandering particle. That's an invitation to solve the PDE by simulation instead of algebra: throw a swarm of random particles at it and average. This page does exactly that, live in the browser, and shows how cheap it is.</p>
+<h1 class="title">The Feynman–Kac Formula</h1>
+<p class="lead">The <a href="https://en.wikipedia.org/wiki/Feynman%E2%80%93Kac_formula" target="_blank" rel="noopener">Feynman–Kac formula</a> says that the solution to a certain kind of partial differential equation, at a point \((x,t)\), equals the expected value of a "cost" racked up along a randomly-wandering path that starts at \(x\). It's a bridge between two very different-looking worlds: deterministic PDEs solved on a grid, and random particles simulated path by path. This page builds that bridge piece by piece, with a live simulation at every step.</p>
 
-<h2><span class="n">1</span>The setup</h2>
-<p>Take the worked example from the Wikipedia article: the convection–diffusion equation</p>
-$$\frac{\partial u}{\partial t} + \frac{\partial u}{\partial x} = -\frac{\partial^2 u}{\partial x^2},\qquad u(x,1) = e^{-x^2}.$$
-<p>has the closed-form solution \(u(x,t) = (5-4t)^{-1/2}\exp\!\big(-(1-t+x)^2/(5-4t)\big)\). Feynman–Kac says the same \(u(x,t)\) is also</p>
-$$u(x,t) = \mathbb E\big[e^{-X_T^2} \,\big|\, X_t = x\big],\qquad dX_t = dt + \sqrt 2\,dW_t,\quad T=1,$$
-<p>i.e.: start a particle at \((x,t)\), let it jitter forward under this specific drift-plus-noise rule until time \(T=1\), score it by \(e^{-X_T^2}\) wherever it lands, and average that score over many independent particles. That average <em>is</em> \(u(x,t)\) — no PDE solver required.</p>
-
-<div id="global" role="group" aria-label="Simulation controls">
-  <div class="ctl"><b>x₀</b><input id="gX" type="range" min="-3" max="3" step="0.1" value="0"><output id="oX"></output></div>
-  <div class="ctl"><b>t₀</b><input id="gT" type="range" min="0" max="0.9" step="0.01" value="0"><output id="oT"></output></div>
-  <div class="ctl"><b>paths N</b><input id="gN" type="range" min="50" max="20000" step="50" value="4000"><output id="oN"></output></div>
-  <div class="ctl"><b>step size Δt</b><input id="gDt" type="range" min="0.002" max="0.05" step="0.001" value="0.01"><output id="oDt"></output></div>
-  <div class="opts" style="margin:0"><button id="gNew">New random seed</button></div>
+<h2><span class="n">1</span>The one-sentence idea</h2>
+<p>Pick a point \((x,t)\). On one side is a PDE's solution \(u(x,t)\) — a single deterministic number. On the other side is a swarm of random particles, all starting at \(x\) and wandering forward in time. Feynman–Kac's claim: <b>\(u(x,t)\) is exactly the average outcome of that swarm.</b> Drag the start point below and watch both sides move together.</p>
+<div class="card">
+  <h3>The Rosetta stone: a PDE solution and a particle swarm, side by side</h3>
+  <div id="global1" class="opts"><span class="ctl"><b>x₀</b><input id="g1x" type="range" min="-2.5" max="2.5" step="0.1" value="0"><output id="o1x"></output></span></div>
+  <div class="two-col">
+    <svg class="chart" id="h1map" role="img" aria-label="Heatmap of the PDE solution u(x,t)"></svg>
+    <svg class="chart" id="h1paths" role="img" aria-label="Simulated particle paths from the chosen point"></svg>
+  </div>
+  <div class="legend" id="l1"></div>
+  <p class="small" style="margin:8px 0 0">Left: \(u(x,t)\) for the worked example below (darker = larger), with the ring marking \((x_0, 0)\). Right: a bundle of particles launched from that same point, wandering forward to \(t=1\). Section 5 shows the average of these paths' payoffs converging to the exact value of \(u\) at that point.</p>
 </div>
 
-<h2><span class="n">2</span>The particle swarm</h2>
-<p>Each thin line below is one simulated path \(X_s\) for \(s\in[t_0,1]\), stepped forward with the <a href="https://en.wikipedia.org/wiki/Euler%E2%80%93Maruyama_method" target="_blank" rel="noopener">Euler–Maruyama method</a>: \(X_{s+\Delta t} = X_s + \mu\,\Delta t + \sigma\sqrt{\Delta t}\,Z\) for a fresh standard-normal draw \(Z\) at every step. The drift \(\mu=1\) pushes every path to the right; the noise \(\sigma=\sqrt2\) fans them out.</p>
+<h2><span class="n">2</span>Setting up the pieces</h2>
+<p>Three ingredients go into the formula. Each gets its own small widget before they combine.</p>
+
+<h3 style="margin-top:28px">2a. The random path</h3>
+<p>The particle is an <a href="https://en.wikipedia.org/wiki/It%C3%B4_calculus" target="_blank" rel="noopener">Itô diffusion</a>: \(dX_s = \mu\,ds + \sigma\,dW_s\). The drift \(\mu\) pushes it in a direction; the noise \(\sigma\,dW_s\) (Brownian motion) jitters it. Drag both and watch the swarm fan out, and where it ends up at \(s=1\).</p>
+<div class="card">
+  <div id="global2a" class="opts">
+    <span class="ctl"><b>μ (drift)</b><input id="g2mu" type="range" min="-2" max="2" step="0.1" value="1"><output id="o2mu"></output></span>
+    <span class="ctl"><b>σ (noise)</b><input id="g2sig" type="range" min="0.05" max="2.5" step="0.05" value="1"><output id="o2sig"></output></span>
+  </div>
+  <div class="two-col">
+    <svg class="chart" id="h2a" role="img" aria-label="Simulated paths with adjustable drift and noise"></svg>
+    <svg class="chart" id="h2aHist" role="img" aria-label="Histogram of endpoints"></svg>
+  </div>
+  <div class="legend" id="l2a"></div>
+</div>
+
+<h3 style="margin-top:28px">2b. Running cost and discounting</h3>
+<p>The particle can also incur cost as it moves, at rate \(f(X_s,s)\), while "decaying" at rate \(V(X_s,s)\) — so cost incurred far in the future counts for less, via the discount factor \(e^{-\int_t^s V\,dr}\). Drag the time slider to scrub along one fixed path and watch both meters move: the cost bar fills as the particle accumulates \(f\), the discount bar drains as decay compounds.</p>
+<div class="card">
+  <div id="global2b" class="opts"><span class="ctl"><b>time s</b><input id="g2s" type="range" min="0" max="100" step="1" value="0"><output id="o2s"></output></span></div>
+  <svg class="chart" id="h2b" role="img" aria-label="A single path with a moving time marker"></svg>
+  <div class="meters">
+    <span>cost so far</span><div class="meter"><i id="o2cost" style="background:var(--c-mean)"></i></div><output id="o2costv"></output>
+    <span>discount factor</span><div class="meter"><i id="o2disc" style="background:var(--c-w)"></i></div><output id="o2discv"></output>
+  </div>
+  <p class="small">Here \(f(x,s)=|x|\) (cost grows with distance from 0) and \(V(x,s)=1.2\) (constant decay rate), just to illustrate the shapes — not tied to the worked example in §5, which has no cost or decay term.</p>
+</div>
+
+<h3 style="margin-top:28px">2c. Terminal payoff</h3>
+<p>At the fixed horizon \(T\), the particle incurs one final lump cost \(\psi(X_T)\), wherever it happens to have landed. The histogram in §2a already shows the first half of this — where particles end up; §5 below adds the payoff function on top of exactly that kind of histogram.</p>
+
+<h2><span class="n">3</span>The theorem, stated</h2>
+<p>For the PDE</p>
+$$\frac{\partial u}{\partial t} + \mu(x,t)\frac{\partial u}{\partial x} + \tfrac12\sigma^2(x,t)\frac{\partial^2 u}{\partial x^2} - V(x,t)\,u + f(x,t) = 0,\qquad u(x,T)=\psi(x),$$
+<p>the solution is the expectation</p>
+$$u(x,t) = \mathbb E\left[\,e^{-\int_t^T V(X_s,s)\,ds}\,\psi(X_T) \;+\; \int_t^T e^{-\int_t^\tau V(X_s,s)\,ds} f(X_\tau,\tau)\,d\tau \;\middle|\; X_t = x\,\right]$$
+<p>where \(X_t\) is exactly the particle from §2: \(dX_t = \mu(X_t,t)\,dt + \sigma(X_t,t)\,dW_t\). Matching each piece to the story above:</p>
+<div class="pseudo">u(x,t) = E[ <span style="color:var(--c-w)"><b>discount</b></span> · <span style="color:var(--c-clip)"><b>terminal payoff ψ(X_T)</b></span> + ∫ <span style="color:var(--c-w)"><b>discount</b></span> · <span style="color:var(--c-mean)"><b>running cost f</b></span> dτ &nbsp;|&nbsp; <span style="color:var(--c-med)"><b>starts at x, time t</b></span> ]</div>
+<div class="legend-terms">
+  <span><i class="sw box" style="border-color:var(--c-w);color:var(--c-w)"></i>discount <code>e^(-∫V ds)</code> ↔ the decay meter in §2b</span>
+  <span><i class="sw box" style="border-color:var(--c-mean);color:var(--c-mean)"></i>running cost <code>f</code> ↔ the cost meter in §2b</span>
+  <span><i class="sw box" style="border-color:var(--c-clip);color:var(--c-clip)"></i>terminal payoff <code>ψ(X_T)</code> ↔ the histogram overlay in §2c / §5</span>
+  <span><i class="sw box" style="border-color:var(--c-med);color:var(--c-med)"></i>conditioning <code>X_t=x</code> ↔ the launch point in §1 / §2a</span>
+</div>
+<p>Read as "expected cost-to-go": a particle starting at \((x,t)\), accruing running cost, decaying so future cost is discounted, with one final cost at the end — \(u(x,t)\) is the expected total.</p>
+
+<h2><span class="n">4</span>Why it's true <span class="small" style="font-weight:400">(sketch, not full proof)</span></h2>
+<p>Define the discount process \(g(t,s)=e^{-\int_t^s V(X_r,r)\,dr}\) and \(Y_s = g(t,s)\,u(X_s,s) + \int_t^s g(t,\tau) f(X_\tau,\tau)\,d\tau\). Applying <a href="https://en.wikipedia.org/wiki/It%C3%B4%27s_lemma" target="_blank" rel="noopener">Itô's lemma</a> to \(u(X_s,s)\) and differentiating \(Y_s\), the PDE from §3 turns out to be <em>exactly</em> the condition that makes the drift term of \(dY_s\) vanish — i.e. exactly what's needed for \(Y_s\) to be a <a href="https://en.wikipedia.org/wiki/Martingale_(probability_theory)" target="_blank" rel="noopener">martingale</a> (a process whose expected future value, given the present, is its current value). Once that holds, \(u(x,t)=\mathbb E[Y_t]=\mathbb E[Y_T\mid X_t=x]\), and \(Y_T\) is exactly the bracketed expression in §3. The full algebra is in the <a href="https://en.wikipedia.org/wiki/Feynman%E2%80%93Kac_formula#Derivation" target="_blank" rel="noopener">Wikipedia derivation</a>; here's the martingale property itself, made visible instead.</p>
+<div class="card">
+  <h3>Martingale under a microscope: \(Y_s\) wiggles, but its average doesn't move</h3>
+  <div id="global4" class="opts">
+    <span class="ctl"><b>x₀</b><input id="g4x" type="range" min="-2" max="2" step="0.1" value="0"><output id="o4x"></output></span>
+    <span class="ctl"><b>t₀</b><input id="g4t" type="range" min="0" max="0.8" step="0.05" value="0"><output id="o4t"></output></span>
+  </div>
+  <div style="position:relative;aspect-ratio:760/280">
+    <svg class="chart" id="h4" role="img" aria-label="Individual martingale paths" style="position:absolute;inset:0;width:100%;height:100%"></svg>
+    <svg class="chart" id="h4mean" role="img" aria-label="Average of the martingale paths" style="position:absolute;inset:0;width:100%;height:100%;background:none;border:none"></svg>
+  </div>
+  <div class="legend" id="l4"></div>
+  <p class="small" style="margin:8px 0 0">For this worked example \(V=f=0\), so \(Y_s\) reduces to \(u(X_s,s)\) itself. Each thin line is one path's \(u(X_s,s)\) as \(s\) runs forward — individually unpredictable — while the thick line is the average over all simulated paths, which should stay flat at \(u(x_0,t_0)\) for every \(s\), exactly as the martingale property requires.</p>
+</div>
+
+<h2><span class="n">5</span>Worked numerical example</h2>
+<p>The convection–diffusion equation \(\partial_t u + \partial_x u = -\partial_x^2 u\) with \(u(x,1)=e^{-x^2}\) has the closed form \(u(x,t)=(5-4t)^{-1/2}\exp\!\big(-(1-t+x)^2/(5-4t)\big)\), and equivalently \(u(x,t)=\mathbb E[e^{-X_T^2}\mid X_t=x]\) with \(dX_t = dt + \sqrt2\,dW_t\), \(T=1\) — no cost or decay terms, just drift, noise, and a terminal payoff. This is the example worked out in the Wikipedia article; everything below runs it live.</p>
+<div id="global3" role="group" aria-label="Simulation controls">
+  <div class="ctl"><b>x₀</b><input id="g3x" type="range" min="-3" max="3" step="0.1" value="0"><output id="o3x"></output></div>
+  <div class="ctl"><b>t₀</b><input id="g3t" type="range" min="0" max="0.9" step="0.01" value="0"><output id="o3t"></output></div>
+  <div class="ctl"><b>paths N</b><input id="g3n" type="range" min="50" max="20000" step="50" value="4000"><output id="o3n"></output></div>
+  <div class="ctl"><b>step size Δt</b><input id="g3dt" type="range" min="0.002" max="0.05" step="0.001" value="0.01"><output id="o3dt"></output></div>
+  <div class="opts" style="margin:0"><button id="g3new">New random seed</button></div>
+</div>
 <div class="card">
   <h3>Sample paths from \((x_0, t_0)\) to \(T=1\)</h3>
-  <svg class="chart" id="hPaths" role="img" aria-label="Simulated particle paths"></svg>
-  <div class="legend" id="lPaths"></div>
+  <svg class="chart" id="h3paths" role="img" aria-label="Simulated particle paths"></svg>
+  <div class="legend" id="l3paths"></div>
 </div>
-
-<h2><span class="n">3</span>Where they land, and what that's worth</h2>
-<p>At \(T=1\) every path has some endpoint \(X_T\). The histogram shows where they landed; overlaid is the payoff \(e^{-X_T^2}\) each endpoint earns (bright center, fading tails — far-out endpoints are worth almost nothing).</p>
 <div class="card">
-  <h3>Endpoint distribution and payoff</h3>
-  <svg class="chart" id="hEnd" role="img" aria-label="Histogram of simulated endpoints with payoff overlay"></svg>
-  <div class="legend" id="lEnd"></div>
+  <h3>Where they land, and what that's worth</h3>
+  <svg class="chart" id="h3end" role="img" aria-label="Histogram of simulated endpoints with payoff overlay"></svg>
+  <div class="legend" id="l3end"></div>
 </div>
-
-<h2><span class="n">4</span>Averaging converges — and it's cheap</h2>
-<p>The Feynman–Kac estimate is just the running average of the payoff over paths simulated so far. By the <a href="https://en.wikipedia.org/wiki/Central_limit_theorem" target="_blank" rel="noopener">central limit theorem</a> its standard error shrinks like \(1/\sqrt N\), so the band below narrows as more paths are thrown in, converging on the dashed exact value. The timing line underneath is the actual wall-clock cost of the whole simulation on this page, in your browser, right now.</p>
 <div class="card">
   <h3>Monte Carlo estimate of u(x₀, t₀) vs. number of paths</h3>
-  <svg class="chart" id="hConv" role="img" aria-label="Convergence of the Monte Carlo estimate"></svg>
-  <div class="legend" id="lConv"></div>
-  <div id="rConv"></div>
+  <svg class="chart" id="h3conv" role="img" aria-label="Convergence of the Monte Carlo estimate"></svg>
+  <div class="legend" id="l3conv"></div>
+  <div id="r3"></div>
 </div>
-<div class="callout"><p>Drag <b>N</b> up to its max (20,000 paths × up to ~450 steps each) and watch the timing line. On ordinary hardware this stays well under a tenth of a second — the simulation is a few hundred thousand multiply-adds, and every path is independent, so there's nothing to parallelize or optimize beyond what a single <code>for</code> loop already does. The expensive regime for Monte Carlo methods is high-dimensional state or extremely fine time steps, neither of which this toy problem needs.</p></div>
+<div class="callout"><p>Drag <b>N</b> up to its max (20,000 paths × up to ~450 steps each). On ordinary hardware this stays well under a tenth of a second: a few hundred thousand multiply-adds, and every path is independent. The expensive regime for Monte Carlo methods is high-dimensional state or extremely fine time steps — neither applies here.</p></div>
 
-<h2><span class="n">5</span>Why this works</h2>
-<p>This isn't a coincidence or an approximation trick bolted onto the PDE — it's the content of the theorem. Feynman–Kac proves that <em>any</em> solution of a PDE of this form equals an expectation over paths of the matching stochastic differential equation. So simulating particles isn't a heuristic stand-in for solving the PDE: it's a different, valid way of computing the exact same number, at a cost that scales with how precisely you want the answer rather than with how hard the PDE is to discretize. That's why Monte Carlo methods are the tool of choice for Feynman–Kac problems in high dimensions — pricing options on baskets of dozens of correlated stocks, say — where a grid-based PDE solver would need a grid with astronomically many cells, but simulating one more random path costs exactly as much as it always did.</p>
+<h2><span class="n">6</span>Generalization: when the particle runs until it hits a wall</h2>
+<p>So far time runs for a fixed horizon \(T\). The formula generalizes to <b>elliptic</b> PDEs too, with no time variable at all: instead of stopping at \(T\), the particle runs until it first exits a bounded domain \(D\), at a random exit time \(\tau_D\). The boundary condition \(\psi\) is then paid wherever it exits (the <a href="https://en.wikipedia.org/wiki/Dirichlet_problem" target="_blank" rel="noopener">Dirichlet problem</a>). Take the simplest case: pure Brownian motion (no drift) on the interval \((a,b)=(-2,2)\), with \(\psi(a)=0\), \(\psi(b)=1\). With no drift the PDE is just \(\tfrac12 u''=0\), so \(u\) is linear: \(u(x) = (x-a)/(b-a)\) — the same straight line you'd get by linear interpolation.</p>
+<div id="global6" class="opts"><span class="ctl"><b>x₀</b><input id="g6x" type="range" min="-1.8" max="1.8" step="0.1" value="0"><output id="o6x"></output></span></div>
+<div class="card">
+  <h3>Paths wander until they exit (−2, 2)</h3>
+  <svg class="chart" id="h6" role="img" aria-label="Paths exiting a bounded domain"></svg>
+  <div class="legend" id="l6"></div>
+</div>
+<div class="card">
+  <h3>Convergence to the exact (linear) solution</h3>
+  <svg class="chart" id="h6conv" role="img" aria-label="Convergence of the exit-time estimate"></svg>
+  <div class="legend" id="l6conv"></div>
+  <div id="r6"></div>
+</div>
+<p class="small">This is a genuinely different picture from §1–5: there "wander for a fixed time," here "wander until you hit a wall." The same formula covers both, and the <a href="https://en.wikipedia.org/wiki/Feynman%E2%80%93Kac_formula#Higher_dimensions" target="_blank" rel="noopener">N-dimensional case</a> covers a particle diffusing in a domain of any shape in any number of dimensions — just harder to draw.</p>
+
+<h2><span class="n">7</span>Applications</h2>
+<p><b>Finance.</b> In the Black–Scholes model, a stock price \(S_t\) follows geometric Brownian motion, \(dS_t = (r\,dt + \sigma\,dW_t)S_t\). A European call option pays \((S_T-K)^+\) at expiry \(T\), and the risk-free rate \(r\) plays the role of the decay rate \(V\). Plugging this into Feynman–Kac recovers the Black–Scholes PDE exactly — so the no-arbitrage option price <em>is</em> a Feynman–Kac expectation, and can be computed by simulating stock-price paths and averaging the discounted payoff, exactly like §5.</p>
+<div id="global7" class="opts"><span class="ctl"><b>volatility σ</b><input id="g7sig" type="range" min="0.05" max="0.6" step="0.01" value="0.2"><output id="o7sig"></output></span></div>
+<div class="card">
+  <h3>Simulated stock price paths</h3>
+  <svg class="chart" id="h7paths" role="img" aria-label="Simulated geometric Brownian motion paths"></svg>
+  <div class="legend" id="l7paths"></div>
+</div>
+<div class="card">
+  <h3>Distribution of S<sub>T</sub> at expiry</h3>
+  <svg class="chart" id="h7hist" role="img" aria-label="Histogram of simulated stock prices at expiry"></svg>
+  <div class="legend" id="l7hist"></div>
+</div>
+<div class="card">
+  <h3>Monte Carlo option price vs. Black–Scholes</h3>
+  <svg class="chart" id="h7conv" role="img" aria-label="Convergence of the Monte Carlo option price"></svg>
+  <div class="legend" id="l7conv"></div>
+  <div id="r7"></div>
+</div>
+<p class="small">Not every option fits: an American option has no fixed expiry, and an average option's payoff depends on the whole price path rather than just \(S_T\), so Feynman–Kac doesn't directly apply to either.</p>
+<p><b>Quantum mechanics.</b> The same machinery, run in imaginary time, underlies <a href="https://en.wikipedia.org/wiki/Diffusion_Monte_Carlo" target="_blank" rel="noopener">diffusion Monte Carlo</a> methods for solving the Schrödinger equation in quantum chemistry — a genuinely different story (it needs the complex-valued case Kac's proof doesn't cover), so just a pointer here rather than a widget.</p>
+
+<h2><span class="n">8</span>Where it came from</h2>
+<p>Richard Feynman and Mark Kac were colleagues at Cornell in 1947. Kac attended a talk of Feynman's and realized that Feynman's path-integral heuristic for quantum mechanics — real-valued paths weighted by a complex phase — had a rigorous probabilistic counterpart once the weight was made real-valued, via exactly the kind of expectation in §3. Kac published the result in 1949, originally as a way to compute distributions of certain <a href="https://en.wikipedia.org/wiki/Wiener_process" target="_blank" rel="noopener">Wiener functionals</a>. The complex-valued case actually needed for quantum mechanics is, per the Wikipedia article, still an open question.</p>
 
 </main>
 <script type="module" src="app.js"></script>

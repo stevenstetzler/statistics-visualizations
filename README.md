@@ -5,3 +5,5 @@ Interactive statistics visualizations. The pages live in `dof/`: `tutorial.html`
 Rebuild with `npm install && npm run build` (sources in `src/`, output in `dof/`).
 
 `center_and_spread/` is a hand-written, build-free page (`index.html`, `style.css`, `app.js`, `stats.js`) on estimating the center and spread of a contaminated sample. It borrows the KaTeX files vendored in `dof/vendor/katex`.
+
+`feynman_kac/` is a hand-written page explaining the Feynman–Kac formula, with a live particle-simulation widget for every section (`index.html`, `style.css`, `app.js`, `sim.js`). `explainer-draft.md` is the working outline it was built from.
