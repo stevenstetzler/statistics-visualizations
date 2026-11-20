@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="claude:viewport-fit-sides" content="cover">
 <title>Which Variance-Stabilizing Transform</title>
+<!--KATEX-HEAD--><link rel="stylesheet" href="../dof/vendor/katex/katex.min.css">
+<script defer src="../dof/vendor/katex/katex.min.js"></script>
+<script defer src="../dof/vendor/katex/auto-render.min.js"></script><!--/KATEX-HEAD-->
 <style>
 /* Layout: data input, requirements checklist, then seven numbered steps (a real sequence), each a chart beside a plain-words reading. */
 :root{
@@ -116,7 +119,7 @@ td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
 .two li{margin-bottom:8px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 .eq{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 11px;display:block;overflow-x:auto;margin:6px 0;max-width:none;white-space:pre-wrap}
-.math h3{margin:14px 0 4px;font-size:15px}.math p,.math li{max-width:78ch}.math ul{margin:4px 0 8px;padding-left:20px}
+.math th{text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink)}.math h3{margin:14px 0 4px;font-size:15px}.math .katex-display{margin:8px 0;overflow-x:auto;overflow-y:hidden;padding:2px 0}.math .katex{font-size:1.08em}.math p,.math li{max-width:78ch}.math ul{margin:4px 0 8px;padding-left:20px}
 </style>
 </head>
 <body>
@@ -695,63 +698,65 @@ function polyCoefs(beta,xm,xs){
   if(beta.length===2)return[beta[0]-beta[1]*xm/xs,beta[1]/xs];
   const[b0,b1,b2]=beta;return[b0-b1*xm/xs+b2*xm*xm/(xs*xs),b1/xs-2*b2*xm/(xs*xs),b2/(xs*xs)];
 }
-function polyStr(c,sym){
-  const t=c.map((v,i)=>{const a=f3(Math.abs(v));const term=i===0?a:i===1?a+'·x':a+'·x²';return (i===0?(v<0?'−':''):(v<0?' − ':' + '))+term});
-  return sym+' = '+t.join('');
+const tn=v=>num(v).replace('−','-');
+const tf=v=>f3(v).replace('−','-');
+function polyTex(c){return c.map((v,i)=>{const a=tf(Math.abs(v));const term=i===0?a:i===1?a+String.raw`\,x`:a+String.raw`\,x^2`;return (i===0?(v<0?'-':''):(v<0?'-':'+'))+term}).join('')}
+function renderMath(){
+  if(window.renderMathInElement)renderMathInElement($('r8'),{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false});
 }
 function math(){
   const n=S.n,deg=S.deg,T=S.T,bc=S.bc,f0=S.f0,f1=S.after.f1;
   const c0=polyCoefs(f0.beta,S.ols.xm,S.ols.xs),c1=polyCoefs(f1.beta,S.ols.xm,S.ols.xs);
   const xmed=[...D.x].sort((a,b)=>a-b)[Math.floor(n/2)];
   const ev=(c,x)=>c.reduce((s,v,i)=>s+v*Math.pow(x,i),0);
-  const m0=ev(c0,xmed),mT=ev(c1,xmed);
-  const sig2=f1.sigma2,sig=Math.sqrt(sig2);
+  const m0=ev(c0,xmed),mT=ev(c1,xmed),sig2=f1.sigma2,sig=Math.sqrt(sig2),nk=Math.round(S.n/S.bins.length);
   let h='';
-  /* 8.1 */
-  h+='<h3>8.1 The average, E[y | x]: least squares</h3>'
-   +'<p>We assume y<sub>i</sub> = f(x<sub>i</sub>; β) + ε<sub>i</sub>, with f a '+(deg===1?'straight line':'quadratic curve')+' and E[ε<sub>i</sub>] = 0. Least squares picks the coefficients that make the sum of squared leftovers as small as possible:</p>'
-   +'<span class="eq">β̂ = argmin Σ (y<sub>i</sub> − f(x<sub>i</sub>; β))²   which has the closed form   β̂ = (XᵀX)⁻¹ Xᵀ y</span>'
-   +'<p>Here X has a column of ones'+(deg===1?' and a column of x':', a column of x and a column of x²')+' (the page standardizes x first so the arithmetic stays stable). For your data:</p>'
-   +'<span class="eq">'+polyStr(c0,'Ê[y | x]')+'\nRSS = Σ eᵢ² = '+f3(f0.rss)+'   (n = '+n+')</span>'
-   +'<p>If this f is right, the leftovers e<sub>i</sub> = y<sub>i</sub> − f̂(x<sub>i</sub>) average to zero at every x. Least squares says nothing yet about how <em>spread out</em> they are. That is the variance function.</p>';
-  /* 8.2 */
-  h+='<h3>8.2 The variance, Var[y | x]: spread–level regression</h3>';
+  h+='<h3>8.1 The average, \\(E[y\\mid x]\\): least squares</h3>'
+   +'<p>We assume \\(y_i=f(x_i;\\beta)+\\varepsilon_i\\) with \\(f\\) a '+(deg===1?'straight line':'quadratic curve')+' and \\(E[\\varepsilon_i]=0\\). Least squares picks the coefficients that make the sum of squared leftovers as small as possible, and it has a closed form:</p>'
+   +String.raw`$$\hat\beta=\arg\min_\beta\sum_{i=1}^{n}\bigl(y_i-f(x_i;\beta)\bigr)^2=(X^{\top}X)^{-1}X^{\top}y$$`
+   +'<p>\\(X\\) has a column of ones'+(deg===1?' and a column of \\(x\\)':', a column of \\(x\\) and a column of \\(x^2\\)')+' (the page standardizes \\(x\\) first so the arithmetic stays stable). For your data:</p>'
+   +String.raw`$$\begin{aligned}\hat E[y\mid x]&=`+polyTex(c0)+String.raw`\\ \mathrm{RSS}&=\sum_i e_i^2=`+tf(f0.rss)+String.raw`\quad(n=`+n+String.raw`)\end{aligned}$$`
+   +'<p>If \\(f\\) is right, the leftovers \\(e_i=y_i-\\hat f(x_i)\\) average to zero at every \\(x\\). Least squares says nothing yet about how <em>spread out</em> they are. That is the variance function.</p>';
+  h+='<h3>8.2 The variance, \\(\\mathrm{Var}[y\\mid x]\\): spread–level regression</h3>';
   if(S.valid){
     const sl=S.sl,lc=Math.exp(sl.mv-sl.b*sl.mx);
-    h+='<p>We let the variance depend on x only through the average, Var[y | x] = h(μ(x))². In each of the K bins we measure the spread and the level:</p>'
-     +'<span class="eq">s<sub>k</sub> = √( mean of eᵢ² in bin k ),    μ<sub>k</sub> = mean of f̂(xᵢ) in bin k</span>'
-     +'<p>Assuming a power law, SD = c·μ<sup>b</sup>, then ln s = ln c + b·ln μ. That is a straight line in log–log, so b is again found by least squares on the K bin dots. Each ln s<sub>k</sub> is noisy by about 1/√(2·n<sub>k</sub>) ('+Math.round(S.n/S.bins.length)+' dots per bin here), which also sets the 95% band for b: b ± 1.96·SE(b).</p>'
-     +'<span class="eq">b̂ = '+num(sl.b)+'  (95% range '+num(sl.lo)+' to '+num(sl.hi)+'),   ĉ = '+f3(lc)+'\nVar̂[y | x] = ĉ² · Ê[y | x]<sup>2·'+num(sl.b)+'</sup>   (SD ≈ '+f3(lc)+' · μ(x)<sup>'+num(sl.b)+'</sup>)</span>'
-     +'<p>Why this gives λ: the delta method says Var[g(y)] ≈ g′(μ)²·Var[y]. For g(y) = y<sup>λ</sup> that is λ²·μ<sup>2λ−2</sup>·c²·μ<sup>2b</sup>, which is constant only when 2λ − 2 + 2b = 0, so <b>λ = 1 − b = '+num(1-sl.b)+'</b>.</p>';
+    h+='<p>We let the variance depend on \\(x\\) only through the average, \\(\\mathrm{Var}[y\\mid x]=h(\\mu(x))^2\\). In each of the \\(K\\) bins we measure the spread and the level:</p>'
+     +String.raw`$$s_k=\sqrt{\frac{1}{n_k}\sum_{i\in k}e_i^2},\qquad \mu_k=\frac{1}{n_k}\sum_{i\in k}\hat f(x_i)$$`
+     +'<p>Assuming a power law, \\(\\mathrm{SD}=c\\,\\mu^{b}\\), we get a straight line in log–log, and least squares on the \\(K\\) dots gives \\(b\\):</p>'
+     +String.raw`$$\ln s_k=\ln c+b\,\ln\mu_k$$`
+     +'<p>Each \\(\\ln s_k\\) is noisy by about \\(1/\\sqrt{2n_k}\\) ('+nk+' dots per bin here), which sets the 95% band for \\(b\\): \\(\\hat b\\pm1.96\\,\\mathrm{SE}(\\hat b)\\).</p>'
+     +String.raw`$$\hat b=`+tn(sl.b)+String.raw`\ \ (95\%\ \text{range }`+tn(sl.lo)+String.raw`\text{ to }`+tn(sl.hi)+String.raw`),\qquad \hat c=`+tf(lc)+String.raw`$$`
+     +String.raw`$$\widehat{\mathrm{Var}}[y\mid x]=\hat c^{\,2}\,\hat E[y\mid x]^{\,2\cdot`+tn(sl.b)+String.raw`}$$`
+     +'<p>Why this gives \\(\\lambda\\): the delta method says \\(\\mathrm{Var}[g(y)]\\approx g\'(\\mu)^2\\,\\mathrm{Var}[y]\\). For \\(g(y)=y^{\\lambda}\\) that is</p>'
+     +String.raw`$$\lambda^2\mu^{2\lambda-2}\cdot c^2\mu^{2b},$$`
+     +'<p>which is constant only when \\(2\\lambda-2+2b=0\\), so <b>\\(\\lambda=1-b='+tn(1-sl.b)+'\\)</b>.</p>';
   }else h+='<p>Skipped: some fitted levels are zero or negative, so the log–log regression cannot be done.</p>';
-  /* 8.3 */
   h+='<h3>8.3 Box–Cox: fitting the mean and the variance together</h3>'
-   +'<p>Box–Cox assumes there is a λ for which the transformed response follows a normal linear model with constant variance:</p>'
-   +'<span class="eq">g<sub>λ</sub>(y) = (y<sup>λ</sup> − 1)/λ  (log y if λ = 0) = f(x; β) + ε,   ε ~ N(0, σ²)</span>'
-   +'<p>For each λ the page re-fits β by least squares on g<sub>λ</sub>(y), then scores λ with the profile log-likelihood. The second term is the Jacobian of the transformation. It puts every λ on the same scale of y, otherwise shrinking the data would always look better:</p>'
-   +'<span class="eq">ℓ(λ) = −(n/2)·ln( RSS(λ) / n ) + (λ − 1)·Σ ln yᵢ</span>'
-   +'<p>The best λ maximizes ℓ. Because 2[ℓ(λ̂) − ℓ(λ)] is about χ² with 1 degree of freedom, the 95% range is every λ with ℓ(λ) ≥ ℓ(λ̂) − 1.92.</p>'
-   +'<span class="eq">λ̂ = '+num(bc.lhat)+',   95% range '+(bc.loOpen?'≤ ':'')+num(bc.lo)+' to '+num(bc.hi)+(bc.hiOpen?' or more':'')+'</span>';
-  /* 8.4 */
+   +'<p>Box–Cox assumes there is a \\(\\lambda\\) for which the transformed response follows a normal linear model with constant variance:</p>'
+   +String.raw`$$g_\lambda(y)=\begin{cases}\dfrac{y^{\lambda}-1}{\lambda}&\lambda\neq0\\[4pt]\ln y&\lambda=0\end{cases}\;=\;f(x;\beta)+\varepsilon,\qquad \varepsilon\sim N(0,\sigma^2)$$`
+   +'<p>For each \\(\\lambda\\) the page re-fits \\(\\beta\\) by least squares on \\(g_\\lambda(y)\\), then scores \\(\\lambda\\) with the profile log-likelihood. The second term is the Jacobian of the transformation. It puts every \\(\\lambda\\) on the same scale of \\(y\\); without it, shrinking the data would always look better:</p>'
+   +String.raw`$$\ell(\lambda)=-\frac{n}{2}\ln\!\Bigl(\frac{\mathrm{RSS}(\lambda)}{n}\Bigr)+(\lambda-1)\sum_{i}\ln y_i$$`
+   +'<p>The best \\(\\lambda\\) maximizes \\(\\ell\\). Because \\(2[\\ell(\\hat\\lambda)-\\ell(\\lambda)]\\) is about \\(\\chi^2_1\\), the 95% range is every \\(\\lambda\\) with \\(\\ell(\\lambda)\\ge\\ell(\\hat\\lambda)-1.92\\). Your result:</p>'
+   +String.raw`$$\hat\lambda=`+tn(bc.lhat)+String.raw`,\qquad 95\%\ \text{range }`+(bc.loOpen?String.raw`\le `:'')+tn(bc.lo)+String.raw`\text{ to }`+tn(bc.hi)+(bc.hiOpen?String.raw`\text{ or more}`:'')+String.raw`$$`;
   h+='<h3>8.4 What the transformation you chose says about both functions</h3>'
    +'<p>For the transformation chosen in step 6 ('+T.label+'), the fitted model on the transformed scale is:</p>'
-   +'<span class="eq">'+polyStr(c1,'Ê[g(y) | x]')+'\nVar̂[g(y) | x] = σ̂² = '+f3(sig2)+'   (σ̂ = '+f3(sig)+')</span>'
-   +'<p>On this scale the variance is <em>constant by assumption</em>. That is the whole point of the transformation. Going back to y:</p><ul>';
+   +String.raw`$$\begin{aligned}\hat E[g(y)\mid x]&=`+polyTex(c1)+String.raw`\\ \widehat{\mathrm{Var}}[g(y)\mid x]&=\hat\sigma^2=`+tf(sig2)+String.raw`\quad(\hat\sigma=`+tf(sig)+String.raw`)\end{aligned}$$`
+   +'<p>On this scale the variance is <em>constant by assumption</em>. That is the whole point of the transformation. Going back to \\(y\\):</p><ul>';
   if(T.lam!==null){
     const b2=1-T.lam,inv=m=>T.lam===1?m:T.lam===0?Math.exp(m):Math.pow(Math.max(T.lam*m+1,1e-12),1/T.lam);
-    h+='<li><b>Variance.</b> With g′(μ) = μ<sup>λ−1</sup> the delta method gives Var[y | x] ≈ σ²·μ(x)<sup>2(1−λ)</sup> = σ²·μ(x)<sup>'+num(2*b2)+'</sup>, so SD ∝ μ<sup>'+num(b2)+'</sup>. This is the same b = 1 − λ as in 8.2.'
-      +(S.sl?' The spread–level regression gave b̂ = '+num(S.sl.b)+' (95% range '+num(S.sl.lo)+' to '+num(S.sl.hi)+'), and the transformation implies b = '+num(b2)+', which is '+((b2>=S.sl.lo&&b2<=S.sl.hi)?'<b>inside</b> that range':'<b>outside</b> that range')+'.':'')+'</li>';
-    h+='<li><b>Average.</b> Transforming changes what “the average” means. Back-transforming the fit gives the <em>median</em> of y at each x, g<sup>−1</sup>(Ê[g(y) | x]), not the mean. At x = '+f3(xmed)+': the direct fit on the original scale gives '+f3(m0)+' and the back-transformed fit gives '+f3(inv(mT))+'.'
-      +(T.lam===0?' For the log this means E[y | x] = exp(Ê[ln y | x] + σ²/2), so multiply the median by exp(σ̂²/2) = '+f3(Math.exp(sig2/2))+' to estimate the mean.':T.lam===1?'':' The mean differs from the median by a small term of order σ²·g<sup>−1</sup>″, which you can estimate with the delta method or by simulation.')+'</li>';
-    h+='<li><b>Shape of the average.</b> If f is a straight line on the transformed scale, then on the original scale E[y | x] is <em>curved</em>. If the original average was a straight line, the transformed one is not. That is why Box–Cox and the spread–level plot can give different λ, and why “Curve” in step 0 can move them closer.</li>';
-  }else h+='<li>For arcsin √p, a proportion with n trials has variance ≈ 1/(4n) on the transformed scale, so no further power-law formula is needed. The usual better alternative is a binomial GLM.</li>';
+    h+='<li><b>Variance.</b> With \\(g\'(\\mu)=\\mu^{\\lambda-1}\\), the delta method gives \\(\\mathrm{Var}[y\\mid x]\\approx\\sigma^2\\mu(x)^{2(1-\\lambda)}=\\sigma^2\\mu(x)^{'+tn(2*b2)+'}\\), so \\(\\mathrm{SD}\\propto\\mu^{'+tn(b2)+'}\\). This is the same \\(b=1-\\lambda\\) as in 8.2.'
+      +(S.sl?' The spread–level regression gave \\(\\hat b='+tn(S.sl.b)+'\\) (95% range '+num(S.sl.lo)+' to '+num(S.sl.hi)+'), and the transformation implies \\(b='+tn(b2)+'\\), which is '+((b2>=S.sl.lo&&b2<=S.sl.hi)?'<b>inside</b> that range':'<b>outside</b> that range')+'.':'')+'</li>';
+    h+='<li><b>Average.</b> Transforming changes what “the average” means. Back-transforming the fit gives the <em>median</em> of \\(y\\) at each \\(x\\), \\(g^{-1}(\\hat E[g(y)\\mid x])\\), not the mean. At \\(x='+tf(xmed)+'\\): the direct fit on the original scale gives '+f3(m0)+' and the back-transformed fit gives '+f3(inv(mT))+'.'
+      +(T.lam===0?' For the log, \\(E[y\\mid x]=\\exp\\bigl(\\hat E[\\ln y\\mid x]+\\sigma^2/2\\bigr)\\), so multiply the median by \\(\\exp(\\hat\\sigma^2/2)='+tf(Math.exp(sig2/2))+'\\) to estimate the mean.':T.lam===1?'':' The mean differs from the median by a small term of order \\(\\sigma^2\\), which you can estimate with the delta method or by simulation.')+'</li>';
+    h+='<li><b>Shape of the average.</b> If \\(f\\) is a straight line on the transformed scale, then on the original scale \\(E[y\\mid x]\\) is <em>curved</em>. If the original average was a straight line, the transformed one is not. That is why Box–Cox and the spread–level plot can give different \\(\\lambda\\), and why “Curve” in step 0 can move them closer.</li>';
+  }else h+='<li>For arcsin √p, a proportion with \\(m\\) trials has variance \\(\\approx 1/(4m)\\) on the transformed scale, so no further power-law formula is needed. The usual better alternative is a binomial GLM.</li>';
   h+='</ul>'
-   +'<div class="tbl"><table><thead><tr><th></th><th>E[y | x]</th><th>Var[y | x]</th></tr></thead><tbody>'
-   +'<tr><td><b>Step 2–4</b><br>least squares + spread–level</td><td class="n">'+polyStr(c0,'ŷ')+'</td><td class="n">'+(S.valid?'ĉ²·μ<sup>2·'+num(S.sl.b)+'</sup>, ĉ = '+f3(Math.exp(S.sl.mv-S.sl.b*S.sl.mx)):'not estimated')+'</td></tr>'
-   +'<tr><td><b>Step 5–6</b><br>Box–Cox / '+T.label+'</td><td class="n">'+(T.lam!==null?'median = g<sup>−1</sup>('+polyStr(c1,'m(x)').replace('m(x) = ','')+')':'on the arcsin scale')+'</td><td class="n">'+(T.lam!==null?'σ̂²·μ<sup>'+num(2*(1-T.lam))+'</sup>, σ̂² = '+f3(sig2):'≈ 1/(4n)')+'</td></tr>'
+   +'<div class="tbl"><table><thead><tr><th></th><th>\\(E[y\\mid x]\\)</th><th>\\(\\mathrm{Var}[y\\mid x]\\)</th></tr></thead><tbody>'
+   +'<tr><td><b>Steps 2–4</b><br>least squares + spread–level</td><td>\\(\\hat y='+polyTex(c0)+'\\)</td><td>'+(S.valid?'\\(\\hat c^{2}\\mu^{2\\cdot'+tn(S.sl.b)+'},\\ \\hat c='+tf(Math.exp(S.sl.mv-S.sl.b*S.sl.mx))+'\\)':'not estimated')+'</td></tr>'
+   +'<tr><td><b>Steps 5–6</b><br>Box–Cox / '+T.label+'</td><td>'+(T.lam!==null?'median \\(=g^{-1}\\bigl('+polyTex(c1)+'\\bigr)\\)':'on the arcsin scale')+'</td><td>'+(T.lam!==null?'\\(\\hat\\sigma^2\\mu^{'+tn(2*(1-T.lam))+'},\\ \\hat\\sigma^2='+tf(sig2)+'\\)':'\\(\\approx 1/(4m)\\)')+'</td></tr>'
    +'</tbody></table></div>'
    +'<p style="font-size:13px;color:var(--muted)">The two rows are two different descriptions of the same data. They agree on the variance exponent when the mean function is also right on the transformed scale (see the notes in step 5). When they disagree, look at the mean function first.</p>';
-  $('r8').innerHTML=h;
+  $('r8').innerHTML=h;renderMath();
 }
 /* ---------- wiring ---------- */
 function render(){
@@ -790,6 +795,7 @@ $('usepaste').addEventListener('click',onPaste);
 let rt=null,lastW=0;
 new ResizeObserver(()=>{const w=document.querySelector('.wrap').clientWidth;if(w===lastW)return;lastW=w;clearTimeout(rt);rt=setTimeout(()=>{if(S)render()},80)}).observe(document.querySelector('.wrap'));
 fullRun();
+addEventListener('load',()=>{if(S)math()});
 })();
 </script>
 </body>
