@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Which Variance-Stabilizing Transform</title>
+<style>
+/* Layout: control bar, verdict, 2x2 evidence panels, row of five "after" tiles, then prose. */
+:root{
+  --bg:#f6f7f9;--panel:#ffffff;--ink:#1c2230;--muted:#5b6475;--line:#dde1e8;--grid:#e9ecf1;--link:#1971c2;
+  --c-data:#2a78d6;--c-id:#7d8594;--c-sqrt:#eb6834;--c-log:#1baf7a;--c-recip:#6250d6;--c-arc:#e87ba4;
+  --font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12151b;--panel:#1a1d25;--ink:#e7eaf0;--muted:#98a2b3;--line:#2b3240;--grid:#262c38;--link:#4dabf7;
+  --c-data:#3987e5;--c-id:#8f98a8;--c-sqrt:#d95926;--c-log:#199e70;--c-recip:#9085e9;--c-arc:#d55181;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12151b;--panel:#1a1d25;--ink:#e7eaf0;--muted:#98a2b3;--line:#2b3240;--grid:#262c38;--link:#4dabf7;
+  --c-data:#3987e5;--c-id:#8f98a8;--c-sqrt:#d95926;--c-log:#199e70;--c-recip:#9085e9;--c-arc:#d55181;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--font)}
+.wrap{max-width:1120px;margin:0 auto;padding-block:28px 72px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.disclaimer{padding:8px 16px;font-size:13px;line-height:1.4;color:var(--muted);text-align:center;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--link) 7%,var(--bg))}
+nav.top a{color:var(--link);text-decoration:none;font-size:14px}
+h1{font-size:30px;line-height:1.15;letter-spacing:-.015em;margin:14px 0 8px;text-wrap:balance}
+h2{font-size:20px;margin:40px 0 8px;letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:15px;margin:0 0 2px}
+.lead{max-width:70ch;color:var(--muted);margin:0 0 20px}
+p,li{max-width:72ch}
+sub,sup{line-height:0}
+.eq{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13.5px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px;display:block;max-width:72ch;overflow-x:auto;margin:8px 0}
+
+/* controls */
+.ctl{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:end;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.ctl label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);min-width:0}
+.ctl label span.v{color:var(--ink);font-variant-numeric:tabular-nums}
+.ctl select,.ctl input[type=number],.ctl button{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 8px}
+.ctl input[type=range]{width:140px;max-width:100%}
+.ctl button{cursor:pointer}
+.ctl button:hover{border-color:var(--c-data)}
+:focus-visible{outline:2px solid var(--c-data);outline-offset:2px}
+
+/* verdict */
+.verdict{margin:14px 0;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--c-data);border-radius:8px;padding:12px 16px}
+.verdict .big{font-size:19px;font-weight:600;letter-spacing:-.01em;margin:0 0 4px;max-width:none}
+.verdict p{margin:2px 0;color:var(--muted);max-width:none;font-size:14px}
+.verdict b{color:var(--ink);font-weight:600}
+
+/* key */
+.key{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;margin:6px 0 12px;align-items:center}
+.key .t{color:var(--muted)}
+.key i{display:inline-block;width:18px;height:0;border-top:3px solid;vertical-align:middle;margin-right:6px}
+.key i.dash{border-top-style:dashed}
+
+/* panels */
+.panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:820px){.panels{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px 10px;min-width:0}
+.panel .cap{font-size:13px;color:var(--muted);margin:0 0 6px;max-width:none}
+.panel .head{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.panel .head label{font-size:12px;color:var(--muted);display:flex;gap:5px;align-items:center}
+.chart{width:100%;position:relative}
+svg{display:block;overflow:visible}
+svg text{font-family:var(--font);fill:var(--muted);font-size:11px}
+svg text.strong{fill:var(--ink)}
+svg .gl{stroke:var(--grid);stroke-width:1}
+svg .ax{stroke:var(--line);stroke-width:1}
+circle.hl{stroke:var(--ink);stroke-width:2}
+rect.col.hl{fill:var(--ink);fill-opacity:.07}
+
+/* support bars */
+.bars{display:grid;gap:8px;margin-top:4px}
+.bar{display:grid;grid-template-columns:minmax(0,150px) minmax(0,1fr) 54px;gap:8px;align-items:center;font-size:13px}
+.bar .lab{min-width:0}
+.bar .lab small{display:block;color:var(--muted);font-size:11.5px}
+.bar .track{height:14px;background:var(--grid);border-radius:3px;overflow:hidden}
+.bar .fill{height:100%;border-radius:0 3px 3px 0;min-width:2px}
+.bar .pct{text-align:right;font-variant-numeric:tabular-nums}
+.bar.na{opacity:.45}
+.bar.best .lab b::after{content:" ← best";color:var(--muted);font-weight:400}
+
+/* tiles */
+.tiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+@media (max-width:980px){.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:620px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 10px 8px;min-width:0}
+.tile.flat{border-color:var(--c-log);box-shadow:inset 0 0 0 1px var(--c-log)}
+.tile h3{display:flex;justify-content:space-between;gap:6px;align-items:baseline;font-weight:600}
+.tile h3 em{font-style:normal;font-size:11px;font-weight:600;color:var(--ink);background:color-mix(in srgb,var(--c-log) 22%,var(--panel));padding:1px 6px;border-radius:10px;white-space:nowrap}
+.tile .ratio{font-size:12.5px;color:var(--muted);margin:0;max-width:none}
+.tile .ratio b{color:var(--ink);font-variant-numeric:tabular-nums}
+.note{font-size:13px;color:var(--muted);max-width:none;margin:8px 0 0}
+
+/* tables / prose */
+.tbl{overflow-x:auto;margin:8px 0}
+table{border-collapse:collapse;font-size:14px;min-width:560px;width:100%;background:var(--panel)}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 28px}
+@media (max-width:820px){.two{grid-template-columns:minmax(0,1fr)}}
+.two ul{margin:6px 0 0;padding-left:20px}
+.two li{margin-bottom:8px}
+.try{background:var(--panel);border:1px dashed var(--line);border-radius:8px;padding:10px 14px;margin-top:14px;font-size:14px;max-width:none}
+.try ol{margin:4px 0 0;padding-left:20px}
+#tip{position:fixed;z-index:20;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;line-height:1.35;padding:5px 8px;border-radius:5px;display:none;font-variant-numeric:tabular-nums;max-width:240px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<aside class="disclaimer" role="note">These are experimental learning materials generated with Claude code or another AI model. They are what I tried to get AI to teach me about, using a visualization to prove a point.</aside>
+<div class="wrap">
+<nav class="top"><a href="../index.html">← Statistics visualizations</a></nav>
+<h1>Which variance-stabilizing transformation does my data call for?</h1>
+<p class="lead">You do not have to guess between √y, log y and 1/y. If your data come in groups (dose levels, time bins, bins of fitted value), the way the spread grows with the level tells you. Pick a generating process below, then watch how one dataset points to its own transformation, and how the Box–Cox profile agrees.</p>
+
+<div class="ctl" role="group" aria-label="Dataset controls">
+  <label for="fam">Where the data come from
+    <select id="fam">
+      <option value="lognormal" selected>Multiplicative error (Lognormal)</option>
+      <option value="poisson">Counts (Poisson)</option>
+      <option value="normal">Constant variance (Normal)</option>
+      <option value="recip">SD ∝ mean² (reciprocal-Normal)</option>
+      <option value="binom">Proportions (Binomial, n = 40)</option>
+    </select>
+  </label>
+  <label for="k">Groups <span class="v" id="ok"></span><input id="k" type="range" min="4" max="20" step="1" value="10"></label>
+  <label for="m">Replicates per group <span class="v" id="om"></span><input id="m" type="range" min="3" max="60" step="1" value="10"></label>
+  <label for="R" id="Rlab">Range of group means <span class="v" id="oR"></span><input id="R" type="range" min="0.1" max="2.3" step="0.05" value="1.3"></label>
+  <label for="seed">Seed<input id="seed" type="number" value="7" min="1" max="99999" style="width:80px"></label>
+  <button id="resample" type="button">Resample</button>
+</div>
+
+<div class="verdict" id="verdict" aria-live="polite"></div>
+
+<div class="key" aria-label="Key">
+  <span class="t">Candidate variance laws and their transforms:</span>
+  <span><i style="border-color:var(--c-id)"></i>constant → none</span>
+  <span><i style="border-color:var(--c-sqrt)"></i>SD ∝ √μ → √y</span>
+  <span><i style="border-color:var(--c-log)"></i>SD ∝ μ → log y</span>
+  <span><i style="border-color:var(--c-recip)"></i>SD ∝ μ² → 1/y</span>
+  <span><i style="border-color:var(--c-arc)"></i>Var ∝ μ(1−μ) → arcsin √p</span>
+</div>
+
+<div class="panels">
+  <section class="panel" aria-labelledby="hA">
+    <div class="head"><h3 id="hA">1. The data</h3><label for="logy"><input type="checkbox" id="logy"> log y-axis</label></div>
+    <p class="cap">Each column is a group. Dots are replicates, the bar is mean ± 1 SD. Does the spread change from left to right?</p>
+    <div class="chart" id="chA"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="hB">
+    <h3 id="hB">2. Spread–level plot</h3>
+    <p class="cap">One dot per group: log SD against log mean. A straight line of slope <i>b</i> means SD ∝ μ<sup><i>b</i></sup>. The shaded band is the 95% interval for the fitted slope.</p>
+    <div class="chart" id="chB"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="hC">
+    <h3 id="hC">3. Which variance law is best supported?</h3>
+    <p class="cap">Each law is fitted to the dots in panel 2 with only its scale free. Bars show relative support (likelihood ratio, equal prior weight).</p>
+    <div class="bars" id="bars"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="hD">
+    <h3 id="hD">4. Box–Cox profile likelihood</h3>
+    <p class="cap">A second, independent route to λ. Values of λ above the dashed line are not rejected at 95%. The diamond is the spread–level answer, λ = 1 − <i>b</i>.</p>
+    <div class="chart" id="chD"></div>
+  </section>
+</div>
+
+<h2>Did it work? SD of each group after transforming</h2>
+<p class="lead" style="margin-bottom:10px">Each tile transforms the same data and plots every group's SD relative to the typical SD (log scale, 1 = typical). A stabilizing transform gives a flat row of dots near 1.</p>
+<div class="tiles" id="tiles"></div>
+<p class="note" id="tilenote"></p>
+
+<div class="try"><b>Try this</b>
+  <ol>
+    <li>Switch the data source and see the verdict change from √y to log y to 1/y to arcsin √p.</li>
+    <li>Drag <b>Range of group means</b> down to about 1.3×. With the means almost equal there is no way to tell the laws apart, and the verdict says so.</li>
+    <li>Drag <b>Replicates per group</b> down to 3. Each SD is noisy, so the slope's interval widens.</li>
+    <li>Tick <b>log y-axis</b> for the lognormal data: the funnel becomes a tube.</li>
+  </ol>
+</div>
+
+<h2>How the inference works</h2>
+<p>The delta method says that if SD(Y) = h(μ) then a transform g has constant variance when g′(μ) ∝ 1/h(μ). So the shape of h tells you g. We estimate h from the data in three steps.</p>
+<ol>
+  <li><b>Make groups with similar means.</b> Replicates at each dose, time or condition work directly. With a regression and no replicates, fit the model first and bin by fitted value; the residual SD in each bin plays the same role.</li>
+  <li><b>Plot log SD against log mean.</b> If SD = c·μ<sup>b</sup> then log SD = log c + <i>b</i> log μ, a straight line with slope <i>b</i>.</li>
+  <li><b>Integrate.</b> g(y) = ∫ dy / y<sup>b</sup> = y<sup>1−b</sup> (or log y when b = 1). In Box–Cox terms, λ = 1 − <i>b</i>. This is Tukey's spread-versus-level rule.</li>
+</ol>
+<div class="tbl"><table>
+  <thead><tr><th>Slope b</th><th>Variance law</th><th>λ = 1 − b</th><th>Transform</th><th>Typical data</th></tr></thead>
+  <tbody>
+    <tr><td class="n">0</td><td>Var constant</td><td class="n">1</td><td>none</td><td>Well-behaved measurements</td></tr>
+    <tr><td class="n">½</td><td>Var ∝ μ</td><td class="n">½</td><td>√y</td><td>Poisson counts</td></tr>
+    <tr><td class="n">1</td><td>SD ∝ μ (Var ∝ μ²)</td><td class="n">0</td><td>log y</td><td>Multiplicative errors, concentrations, fluxes</td></tr>
+    <tr><td class="n">2</td><td>Var ∝ μ⁴</td><td class="n">−1</td><td>1/y</td><td>Rare, strongly skewed</td></tr>
+    <tr><td class="n">curved</td><td>Var ∝ μ(1−μ)/n</td><td class="n">–</td><td>arcsin √p</td><td>Proportions</td></tr>
+  </tbody>
+</table></div>
+<p>The spread–level fit uses the group SDs only, while Box–Cox uses the whole sample and also asks for roughly normal residuals. When they agree, as in the verdict above, you can trust the choice. When they disagree, the data are usually skewed without the variance depending on the mean, or the groups are too few.</p>
+
+<h2>When is this useful?</h2>
+<div class="two">
+  <div>
+    <h3>Use it to…</h3>
+    <ul>
+      <li><b>Choose the scale before OLS, ANOVA or a t-test.</b> The assumption is equal variance on the scale you analyze. A funnel in the residuals-versus-fitted plot is the cue to run this.</li>
+      <li><b>Pick a model family from the data.</b> b ≈ ½ points to Poisson-like noise, b ≈ 1 to a gamma or lognormal model, a hump in μ(1−μ) to a binomial one. You might then fit a GLM instead of transforming.</li>
+      <li><b>Make plots and distances fair.</b> Heatmaps, PCA and clustering of counts (RNA-seq, photon counts, image pixels) let high-level rows dominate until the noise is stabilized. Magnitudes in astronomy are log flux for the same reason.</li>
+      <li><b>Compare groups on one yardstick.</b> After stabilizing, one pooled SD describes every group, so effect sizes, confidence intervals and power calculations are consistent across levels.</li>
+      <li><b>Choose weights.</b> If you keep the original scale, weighted least squares with weights ∝ 1/μ<sup>2b</sup> uses the same estimate of <i>b</i>.</li>
+      <li><b>Set a tolerance for an assay or instrument.</b> A constant CV (b ≈ 1) says the error is relative, a constant SD says it is absolute.</li>
+    </ul>
+  </div>
+  <div>
+    <h3>Be careful when…</h3>
+    <ul>
+      <li><b>The means barely differ.</b> Without a wide range of levels, every law fits. Panel 3 will show it.</li>
+      <li><b>There is a noise floor plus proportional error.</b> The spread–level plot then bends: flat at low levels and rising at high levels. No single power fits; look at asinh or a generalized log.</li>
+      <li><b>Counts are small or contain many zeros.</b> √(y + 3/8) helps, but a Poisson or negative-binomial GLM is usually better.</li>
+      <li><b>You need the mean on the original scale.</b> Back-transforming gives medians, not means, unless corrected.</li>
+      <li><b>Groups have few replicates or outliers.</b> A group SD from 3 values is itself very noisy (about ±50%), and one outlier can move the whole slope.</li>
+      <li><b>The variance depends on something other than the mean</b>, such as time or batch. Transforming does not fix that.</li>
+    </ul>
+  </div>
+</div>
+</div>
+<div id="tip" role="tooltip"></div>
+
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const mean=a=>a.reduce((s,x)=>s+x,0)/a.length;
+const sdev=a=>{const m=mean(a);return Math.sqrt(a.reduce((s,x)=>s+(x-m)*(x-m),0)/(a.length-1))};
+
+/* ---------- random numbers ---------- */
+function rng(seed){let a=seed>>>0;return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+let U=rng(1),spare=null;
+function N(){if(spare!==null){const s=spare;spare=null;return s}let u=0;while(!u)u=U();const v=U(),r=Math.sqrt(-2*Math.log(u));spare=r*Math.sin(2*Math.PI*v);return r*Math.cos(2*Math.PI*v)}
+function pois(mu){let tot=0;while(mu>0){const c=Math.min(mu,15);mu-=c;const L=Math.exp(-c);let k=0,p=1;do{k++;p*=U()}while(p>L);tot+=k-1}return tot}
+function binom(n,p){let s=0;for(let i=0;i<n;i++)if(U()<p)s++;return s}
+
+/* ---------- generating processes ---------- */
+const NB=40;
+const FAMS={
+  normal:   {mu0:50, setup:()=>({s:6}),                   draw:(mu,p)=>mu+p.s*N(), truth:'id'},
+  poisson:  {mu0:8,  setup:()=>({}),                      draw:mu=>pois(mu), truth:'sqrt'},
+  lognormal:{mu0:10, setup:()=>({}),                      draw:mu=>mu*Math.exp(0.3*N()-0.045), truth:'log'},
+  recip:    {mu0:10, setup:(mu0,mx)=>({tau:0.2/mx,mx}),   draw:(mu,p)=>1/Math.max(1/mu+p.tau*N(),0.05/p.mx), truth:'recip'},
+  binom:    {binom:true, setup:()=>({}),                  draw:mu=>binom(NB,mu)/NB, truth:'arc'}
+};
+
+/* ---------- the five candidate laws / transforms ---------- */
+const CANDS=[
+  {id:'id',   name:'Constant variance', sub:'SD ∝ μ⁰ → no transform',   color:'--c-id',   lnh:x=>0,        lam:'λ = 1',   g:y=>y},
+  {id:'sqrt', name:'SD ∝ √μ',          sub:'Var ∝ μ → √y',             color:'--c-sqrt', lnh:x=>0.5*x,    lam:'λ = ½',   g:y=>Math.sqrt(y)},
+  {id:'log',  name:'SD ∝ μ',           sub:'constant CV → log y',      color:'--c-log',  lnh:x=>x,        lam:'λ = 0',   g:y=>Math.log(y)},
+  {id:'recip',name:'SD ∝ μ²',          sub:'Var ∝ μ⁴ → 1/y',           color:'--c-recip',lnh:x=>2*x,      lam:'λ = −1',  g:y=>-1/y},
+  {id:'arc',  name:'Var ∝ μ(1−μ)',     sub:'proportions → arcsin √p',  color:'--c-arc',  lnh:null,        lam:'',        g:y=>Math.asin(Math.sqrt(Math.min(1,Math.max(0,y))))}
+];
+const TNAME={id:'no transform (λ = 1)',sqrt:'√y (λ = ½)',log:'log y (λ = 0)',recip:'1/y (λ = −1)',arc:'arcsin √p'};
+const TILELAB={id:'none  (λ = 1)',sqrt:'√y  (λ = ½)',log:'log y  (λ = 0)',recip:'1/y  (λ = −1)',arc:'arcsin √p'};
+const css=n=>'var('+n+')';
+
+let G=[],A=null,Rval=20;
+
+function generate(){
+  const fam=FAMS[$('fam').value],k=+$('k').value,m=+$('m').value;
+  Rval=Math.pow(10,+$('R').value);
+  U=rng(+$('seed').value||1);spare=null;
+  const mx=fam.binom?1:fam.mu0*Rval,p=fam.setup(fam.mu0,mx);
+  G=[];
+  for(let i=0;i<k;i++){
+    const mu=fam.binom?0.05+0.9*i/(k-1):fam.mu0*Math.pow(Rval,i/(k-1));
+    const y=[],j=[];for(let r=0;r<m;r++){y.push(fam.draw(mu,p));j.push(U()-0.5)}
+    G.push({mu,y,j});
+  }
+}
+
+/* ---------- analysis ---------- */
+function analyze(){
+  const k=G.length,m=G[0].y.length;
+  const all=G.flatMap(g=>g.y);
+  const mn=Math.min(...all);
+  let shift=0;
+  if(mn<=0){const mp=Math.min(...all.filter(v=>v>0));shift=mp/2-mn}
+  const mus=G.map(g=>mean(g.y)),sds=G.map(g=>sdev(g.y));
+  const x=mus.map(Math.log),v=sds.map(Math.log);
+  const mx=mean(x),mv=mean(v);
+  const Sxx=x.reduce((s,a)=>s+(a-mx)*(a-mx),0)||1e-9;
+  const b=x.reduce((s,a,i)=>s+(a-mx)*(v[i]-mv),0)/Sxx,a0=mv-b*mx;
+  const sse=x.reduce((s,a,i)=>{const r=v[i]-(a0+b*a);return s+r*r},0);
+  const sTh=Math.sqrt(1/(2*(m-1))),sEmp=k>2?Math.sqrt(sse/(k-2)):sTh;
+  const se=Math.max(sTh,sEmp)/Math.sqrt(Sxx);
+  const fit={b,a0,se,lo:b-1.96*se,hi:b+1.96*se,mx,mv};
+  /* candidate laws */
+  const arcOK=mus.every(u=>u>0&&u<1);
+  const cands=CANDS.map(c=>{
+    if(c.id==='arc'&&!arcOK)return{...c,ok:false};
+    const lnh=c.id==='arc'?mus.map(u=>0.5*Math.log(u*(1-u))):x.map(c.lnh);
+    const r=v.map((vi,i)=>vi-lnh[i]),cc=mean(r);
+    const s=r.reduce((t,q)=>t+(q-cc)*(q-cc),0);
+    return{...c,ok:true,cc,sse:s,rms:Math.sqrt(s/k)};
+  });
+  const okc=cands.filter(c=>c.ok),smin=Math.min(...okc.map(c=>c.sse));
+  let tot=0;okc.forEach(c=>{c.w=Math.exp(-(c.sse-smin)*(m-1));tot+=c.w});
+  okc.forEach(c=>c.share=c.w/tot);
+  const best=okc.reduce((p,c)=>c.share>p.share?c:p);
+  /* Box-Cox profile for the one-way (group-means) model */
+  const ys=G.map(g=>g.y.map(q=>q+shift)),n=all.length;
+  const sumLog=ys.flat().reduce((s,q)=>s+Math.log(q),0);
+  const lams=[],ll=[];
+  for(let L=-3;L<=3.0001;L+=0.05){
+    const lam=Math.abs(L)<1e-9?0:L;
+    const t=q=>lam===0?Math.log(q):(Math.pow(q,lam)-1)/lam;
+    let rss=0;ys.forEach(grp=>{const z=grp.map(t),zm=mean(z);z.forEach(q=>{rss+=(q-zm)*(q-zm)})});
+    lams.push(lam);ll.push(-(n/2)*Math.log(rss/n)+(lam-1)*sumLog);
+  }
+  const lmax=Math.max(...ll),ih=ll.indexOf(lmax),cut=lmax-1.92;
+  const inside=ll.map(q=>q>=cut);
+  let iLo=ih,iHi=ih;while(iLo>0&&inside[iLo-1])iLo--;while(iHi<ll.length-1&&inside[iHi+1])iHi++;
+  const bc={lams,ll:ll.map(q=>q-lmax),lhat:lams[ih],lo:lams[iLo],hi:lams[iHi],loOpen:iLo===0,hiOpen:iHi===ll.length-1,shift};
+  /* after-transform tiles */
+  const tiles=CANDS.map(c=>{
+    if(c.id==='arc'&&!all.every(q=>q>=0&&q<=1))return{...c,ok:false};
+    const s=ys.map(grp=>sdev(grp.map(c.g)));
+    const ls=s.map(Math.log),lm=mean(ls);
+    const rel=ls.map(q=>q-lm);
+    const wob=Math.sqrt(mean(rel.map(q=>q*q)));
+    return{...c,ok:true,rel,ratio:Math.exp(Math.max(...ls)-Math.min(...ls)),wob};
+  });
+  const flat=tiles.filter(t=>t.ok).reduce((p,t)=>t.wob<p.wob?t:p);
+  A={k,m,mus,sds,x,v,fit,cands,best,bc,tiles,flat,shift,arcOK,sTh};
+}
+
+/* ---------- drawing helpers ---------- */
+const f3=v=>{const s=Math.abs(v)>=1000?v.toFixed(0):Math.abs(v)>=100?v.toFixed(0):Math.abs(v)>=10?v.toFixed(1):Math.abs(v)>=1?v.toFixed(2):v.toPrecision(2);return s.replace(/\.0+$/,'')};
+const num=v=>(Math.round(v*100)/100).toString().replace('-','−');
+function niceTicks(lo,hi,n){const span=hi-lo,raw=span/n,p=Math.pow(10,Math.floor(Math.log10(raw))),f=raw/p;const st=(f<1.5?1:f<3?2:f<7?5:10)*p;const t=[];for(let q=Math.ceil(lo/st-1e-9)*st;q<=hi+1e-9;q+=st)t.push(+q.toPrecision(12));return t}
+function logTicks(lo,hi){
+  const dec=Math.log10(hi/lo);
+  let mults=dec>2.2?[1]:dec>0.9?[1,2,5]:[1,2,3,4,5,6,8];
+  const t=[];
+  for(let d=Math.floor(Math.log10(lo))-1;d<=Math.ceil(Math.log10(hi));d++)for(const mu of mults){const q=mu*Math.pow(10,d);if(q>=lo*0.999&&q<=hi*1.001)t.push(q)}
+  if(t.length<2){for(const mu of [1,1.5,2,3,4,5,6,8]){for(let d=Math.floor(Math.log10(lo))-1;d<=Math.ceil(Math.log10(hi));d++){const q=mu*Math.pow(10,d);if(q>=lo&&q<=hi&&!t.includes(q))t.push(q)}}t.sort((a,b)=>a-b)}
+  return t;
+}
+const W=el=>Math.max(120,Math.floor(el.clientWidth||320));
+function gAttr(i){return ' data-g="'+i+'"'}
+
+/* ---------- panel 1: data ---------- */
+function drawData(){
+  const el=$('chA'),w=W(el),h=310,mg={l:46,r:8,t:8,b:44};
+  const pw=w-mg.l-mg.r,ph=h-mg.t-mg.b,k=A.k,logy=$('logy').checked,sh=A.shift;
+  const val=q=>logy?q+sh:q;
+  const allv=G.flatMap(g=>g.y.map(val));
+  let lo,hi=Math.max(...allv);
+  if(logy){lo=Math.min(...allv)}else lo=Math.min(0,Math.min(...allv));
+  const Y=logy?(q=>mg.t+ph*(1-(Math.log(Math.max(q,lo))-Math.log(lo))/(Math.log(hi*1.1)-Math.log(lo)))):(q=>mg.t+ph*(1-(q-lo)/((hi-lo)*1.05)));
+  const X=i=>mg.l+(i+0.5)/k*pw,cw=pw/k;
+  let s='<svg width="'+w+'" height="'+h+'" role="img" aria-label="Replicates in each group with mean and one standard deviation bars">';
+  const ticks=logy?logTicks(lo,hi*1.1):niceTicks(lo,hi*1.05,5);
+  ticks.forEach(t=>{s+='<line class="gl" x1="'+mg.l+'" x2="'+(w-mg.r)+'" y1="'+Y(t)+'" y2="'+Y(t)+'"/><text x="'+(mg.l-6)+'" y="'+(Y(t)+4)+'" text-anchor="end">'+f3(t)+'</text>'});
+  s+='<line class="ax" x1="'+mg.l+'" x2="'+(w-mg.r)+'" y1="'+(mg.t+ph)+'" y2="'+(mg.t+ph)+'"/>';
+  G.forEach((g,i)=>{
+    s+='<rect class="col"'+gAttr(i)+' x="'+(mg.l+i*cw)+'" y="'+mg.t+'" width="'+cw+'" height="'+ph+'" fill="transparent"/>';
+    g.y.forEach((q,r)=>{s+='<circle'+gAttr(i)+' cx="'+(X(i)+g.j[r]*cw*0.7)+'" cy="'+Y(val(q))+'" r="2.6" style="fill:var(--c-data);fill-opacity:.55"/>'});
+    const mu=A.mus[i],sd=A.sds[i],bw=cw*0.36;
+    const top=Y(val(mu+sd)),bot=Y(val(Math.max(mu-sd,logy?lo:-1e9)));
+    s+='<g style="stroke:var(--ink);stroke-width:1.5;pointer-events:none"><line x1="'+X(i)+'" x2="'+X(i)+'" y1="'+top+'" y2="'+bot+'"/><line x1="'+(X(i)-bw/2)+'" x2="'+(X(i)+bw/2)+'" y1="'+Y(val(mu))+'" y2="'+Y(val(mu))+'" style="stroke-width:2.5"/></g>';
+    const every=Math.ceil(k/Math.max(2,Math.floor(pw/48)));
+    if(i%every===0)s+='<text x="'+X(i)+'" y="'+(h-mg.b+14)+'" text-anchor="middle">'+f3(mu)+'</text>';
+  });
+  s+='<text x="'+(mg.l+pw/2)+'" y="'+(h-6)+'" text-anchor="middle">group mean (groups in order of mean)</text>';
+  s+='<text transform="translate(12,'+(mg.t+ph/2)+') rotate(-90)" text-anchor="middle">y'+(sh&&logy?' (shifted)':'')+'</text></svg>';
+  el.innerHTML=s;
+}
+
+/* ---------- panel 2: spread-level ---------- */
+function drawSL(){
+  const el=$('chB'),w=W(el),h=330,mg={l:50,r:12,t:10,b:44};
+  const pw=w-mg.l-mg.r,ph=h-mg.t-mg.b;
+  let x0=Math.min(...A.x),x1=Math.max(...A.x);const padx=Math.max((x1-x0)*0.06,0.08);x0-=padx;x1+=padx;
+  const vals=A.v.slice();let v0=Math.min(...vals)-0.35,v1=Math.max(...vals)+0.35;
+  const X=q=>mg.l+(q-x0)/(x1-x0)*pw,Y=q=>mg.t+ph*(1-(q-v0)/(v1-v0));
+  let s='<svg width="'+w+'" height="'+h+'" role="img" aria-label="Log SD against log mean for each group with fitted line and candidate laws"><defs><clipPath id="clB"><rect x="'+mg.l+'" y="'+mg.t+'" width="'+pw+'" height="'+ph+'"/></clipPath></defs>';
+  logTicks(Math.exp(x0),Math.exp(x1)).forEach(t=>{const q=Math.log(t);s+='<line class="gl" x1="'+X(q)+'" x2="'+X(q)+'" y1="'+mg.t+'" y2="'+(mg.t+ph)+'"/><text x="'+X(q)+'" y="'+(mg.t+ph+14)+'" text-anchor="middle">'+f3(t)+'</text>'});
+  logTicks(Math.exp(v0),Math.exp(v1)).forEach(t=>{const q=Math.log(t);s+='<line class="gl" x1="'+mg.l+'" x2="'+(w-mg.r)+'" y1="'+Y(q)+'" y2="'+Y(q)+'"/><text x="'+(mg.l-6)+'" y="'+(Y(q)+4)+'" text-anchor="end">'+f3(t)+'</text>'});
+  s+='<line class="ax" x1="'+mg.l+'" x2="'+(w-mg.r)+'" y1="'+(mg.t+ph)+'" y2="'+(mg.t+ph)+'"/>';
+  s+='<g clip-path="url(#clB)">';
+  /* CI band for fitted slope, anchored at the centroid */
+  const f=A.fit,L=q=>f.mv+f.b*(q-f.mx);
+  s+='<polygon points="'+X(x0)+','+Y(f.mv+f.lo*(x0-f.mx))+' '+X(x1)+','+Y(f.mv+f.lo*(x1-f.mx))+' '+X(x1)+','+Y(f.mv+f.hi*(x1-f.mx))+' '+X(x0)+','+Y(f.mv+f.hi*(x0-f.mx))+'" style="fill:var(--c-data);fill-opacity:.14"/>';
+  A.cands.forEach(c=>{
+    if(!c.ok)return;
+    const emph=c.id===A.best.id;
+    let d='';
+    if(c.id==='arc'){for(let i=0;i<=60;i++){const q=x0+(x1-x0)*i/60,u=Math.exp(q);if(u<=0||u>=1)continue;d+=(d?'L':'M')+X(q)+' '+Y(0.5*Math.log(u*(1-u))+c.cc)}}
+    else d='M'+X(x0)+' '+Y(c.lnh(x0)+c.cc)+'L'+X(x1)+' '+Y(c.lnh(x1)+c.cc);
+    s+='<path d="'+d+'" fill="none" style="stroke:var('+c.color+');stroke-width:'+(emph?2.5:1.6)+';stroke-dasharray:'+(emph?'none':'6 4')+';stroke-opacity:'+(emph?1:.85)+'"/>';
+  });
+  s+='<line x1="'+X(x0)+'" x2="'+X(x1)+'" y1="'+Y(L(x0))+'" y2="'+Y(L(x1))+'" style="stroke:var(--ink);stroke-width:1.2;stroke-opacity:.55"/>';
+  s+='</g>';
+  A.x.forEach((q,i)=>{s+='<circle'+gAttr(i)+' cx="'+X(q)+'" cy="'+Y(A.v[i])+'" r="5" style="fill:var(--c-data);stroke:var(--panel);stroke-width:2"/>'});
+  s+='<text x="'+(mg.l+pw/2)+'" y="'+(h-6)+'" text-anchor="middle">group mean (log scale)</text>';
+  s+='<text transform="translate(12,'+(mg.t+ph/2)+') rotate(-90)" text-anchor="middle">group SD (log scale)</text>';
+  s+='<text x="'+(w-mg.r-4)+'" y="'+(mg.t+14)+'" text-anchor="end" class="strong">fitted slope b = '+num(f.b)+' (95% CI '+num(f.lo)+' to '+num(f.hi)+')</text></svg>';
+  el.innerHTML=s;
+}
+
+/* ---------- panel 3: support bars ---------- */
+function drawBars(){
+  $('bars').innerHTML=A.cands.map(c=>{
+    if(!c.ok)return '<div class="bar na"><div class="lab"><b>'+c.name+'</b><small>needs all means in (0, 1)</small></div><div class="track"></div><div class="pct">n/a</div></div>';
+    const pct=c.share*100;
+    return '<div class="bar'+(c.id===A.best.id?' best':'')+'"><div class="lab"><b>'+c.name+'</b><small>'+c.sub+'</small></div><div class="track"><div class="fill" style="width:'+pct+'%;background:var('+c.color+')"></div></div><div class="pct">'+(pct<0.1?'<0.1':pct.toFixed(pct<10?1:0))+'%</div></div>';
+  }).join('')+'<p class="note">Misfit of the best law: '+num(A.best.rms)+' in log SD (pure sampling noise from '+A.m+' replicates is about '+num(A.sTh)+').</p>';
+}
+
+/* ---------- panel 4: Box-Cox ---------- */
+function drawBC(){
+  const el=$('chD'),w=W(el),h=330,mg={l:50,r:12,t:22,b:44};
+  const pw=w-mg.l-mg.r,ph=h-mg.t-mg.b,b=A.bc;
+  const mnll=Math.min(...b.ll);
+  const ylo=-6;
+  const X=q=>mg.l+(q+3)/6*pw,Y=q=>mg.t+ph*(q/ylo);
+  let s='<svg width="'+w+'" height="'+h+'" role="img" aria-label="Box-Cox profile log-likelihood against lambda with 95 percent interval"><defs><clipPath id="clD"><rect x="'+mg.l+'" y="'+mg.t+'" width="'+pw+'" height="'+ph+'"/></clipPath></defs>';
+  niceTicks(ylo,0,5).forEach(t=>{s+='<line class="gl" x1="'+mg.l+'" x2="'+(w-mg.r)+'" y1="'+Y(t)+'" y2="'+Y(t)+'"/><text x="'+(mg.l-6)+'" y="'+(Y(t)+4)+'" text-anchor="end">'+num(t)+'</text>'});
+  [-3,-2,-1,0,1,2,3].forEach(t=>{s+='<text x="'+X(t)+'" y="'+(mg.t+ph+14)+'" text-anchor="middle">'+num(t)+'</text>'});
+  s+='<line class="ax" x1="'+mg.l+'" x2="'+(w-mg.r)+'" y1="'+(mg.t+ph)+'" y2="'+(mg.t+ph)+'"/>';
+  s+='<g clip-path="url(#clD)">';
+  s+='<rect x="'+X(b.lo)+'" y="'+mg.t+'" width="'+Math.max(2,X(b.hi)-X(b.lo))+'" height="'+ph+'" style="fill:var(--c-data);fill-opacity:.12"/>';
+  [[1,'--c-id','1'],[0.5,'--c-sqrt','½'],[0,'--c-log','0'],[-1,'--c-recip','−1']].forEach(([q,c,lab])=>{
+    s+='<line x1="'+X(q)+'" x2="'+X(q)+'" y1="'+mg.t+'" y2="'+(mg.t+ph)+'" style="stroke:var('+c+');stroke-width:1.6;stroke-dasharray:5 4"/>';
+  });
+  s+='<line x1="'+mg.l+'" x2="'+(w-mg.r)+'" y1="'+Y(-1.92)+'" y2="'+Y(-1.92)+'" style="stroke:var(--muted);stroke-dasharray:3 3"/>';
+  s+='<path d="'+b.lams.map((q,i)=>(i?'L':'M')+X(q)+' '+Y(Math.max(b.ll[i],ylo*1.2))).join('')+'" fill="none" style="stroke:var(--c-data);stroke-width:2.5"/>';
+  s+='<line x1="'+X(b.lhat)+'" x2="'+X(b.lhat)+'" y1="'+mg.t+'" y2="'+Y(0)+'" style="stroke:var(--c-data);stroke-width:1"/>';
+  /* spread-level answer */
+  const lsl=1-A.fit.b,ly=mg.t+ph-12,xa=X(Math.max(-3,Math.min(3,1-A.fit.hi))),xb=X(Math.max(-3,Math.min(3,1-A.fit.lo)));
+  s+='<line x1="'+xa+'" x2="'+xb+'" y1="'+ly+'" y2="'+ly+'" style="stroke:var(--ink);stroke-width:2"/>';
+  const dx=X(Math.max(-3,Math.min(3,lsl)));
+  s+='<path d="M'+dx+' '+(ly-6)+'L'+(dx+6)+' '+ly+'L'+dx+' '+(ly+6)+'L'+(dx-6)+' '+ly+'Z" style="fill:var(--ink);stroke:var(--panel);stroke-width:1.5"/>';
+  s+='</g>';
+  [[1,'1'],[0.5,'½'],[0,'0'],[-1,'−1']].forEach(([q,lab])=>{s+='<text x="'+X(q)+'" y="'+(mg.t-7)+'" text-anchor="middle" class="strong">'+lab+'</text>'});
+  s+='<text x="'+(mg.l+pw/2)+'" y="'+(h-6)+'" text-anchor="middle">λ  (1 = none, ½ = √y, 0 = log y, −1 = 1/y)</text>';
+  s+='<text transform="translate(12,'+(mg.t+ph/2)+') rotate(-90)" text-anchor="middle">log-likelihood − maximum</text>';
+  s+='<text x="'+(w-mg.r-4)+'" y="'+(Y(-1.92)-5)+'" text-anchor="end">95% cutoff (−1.92)</text></svg>';
+  el.innerHTML=s;
+}
+
+/* ---------- tiles ---------- */
+function drawTiles(){
+  const box=$('tiles');
+  if(!box.children.length||box.children.length!==A.tiles.length){
+    box.innerHTML=A.tiles.map(t=>'<div class="tile" id="tile-'+t.id+'"><h3><span>'+TILELAB[t.id]+'</span><em hidden>flattest</em></h3><div class="chart"></div><p class="ratio"></p></div>').join('');
+  }
+  A.tiles.forEach(t=>{
+    const tile=$('tile-'+t.id),ch=tile.querySelector('.chart'),rt=tile.querySelector('.ratio');
+    tile.classList.toggle('flat',A.flat.id===t.id);
+    tile.querySelector('em').hidden=A.flat.id!==t.id;
+    if(!t.ok){ch.innerHTML='<div style="height:130px;display:flex;align-items:center;color:var(--muted);font-size:12.5px">Needs data between 0 and 1.</div>';rt.innerHTML='&nbsp;';return}
+    const w=W(ch),h=130,mg={l:26,r:4,t:6,b:6},pw=w-mg.l-mg.r,ph=h-mg.t-mg.b,k=A.k;
+    const lim=Math.log(16);
+    const X=i=>mg.l+(i+0.5)/k*pw,Y=q=>mg.t+ph*(0.5-Math.max(-lim,Math.min(lim,q))/(2*lim));
+    let s='<svg width="'+w+'" height="'+h+'" role="img" aria-label="Relative SD per group after '+TILELAB[t.id]+'">';
+    [1/8,1/2,2,8].forEach(q=>{s+='<line class="gl" x1="'+mg.l+'" x2="'+(w-mg.r)+'" y1="'+Y(Math.log(q))+'" y2="'+Y(Math.log(q))+'"/>'});
+    [[8,'8×'],[1,'1'],[1/8,'⅛']].forEach(([q,l])=>{s+='<text x="'+(mg.l-4)+'" y="'+(Y(Math.log(q))+4)+'" text-anchor="end">'+l+'</text>'});
+    s+='<line x1="'+mg.l+'" x2="'+(w-mg.r)+'" y1="'+Y(0)+'" y2="'+Y(0)+'" style="stroke:var(--muted);stroke-width:1.2"/>';
+    s+='<path d="'+t.rel.map((q,i)=>(i?'L':'M')+X(i)+' '+Y(q)).join('')+'" fill="none" style="stroke:var('+t.color+');stroke-width:1.6;stroke-opacity:.8"/>';
+    t.rel.forEach((q,i)=>{const off=Math.abs(q)>lim;s+='<circle'+gAttr(i)+' cx="'+X(i)+'" cy="'+Y(q)+'" r="3.6" style="fill:'+(off?'var(--panel)':'var('+t.color+')')+';stroke:var('+t.color+');stroke-width:'+(off?1.8:1.5)+'"/>'});
+    s+='</svg>';
+    ch.innerHTML=s;
+    rt.innerHTML='SD varies <b>×'+(t.ratio>=100?t.ratio.toFixed(0):t.ratio.toFixed(1))+'</b> across groups';
+  });
+  $('tilenote').textContent='Even a perfect transform leaves some wobble, because each SD comes from only '+A.m+' replicates: about ±'+Math.round(A.sTh*100)+'% each, so expect the SDs to span roughly ×'+Math.exp(A.sTh*1.5*Math.sqrt(2*Math.log(A.k))).toFixed(1)+' across '+A.k+' groups. Hollow dots are off the scale.';
+}
+
+/* ---------- verdict ---------- */
+function verdict(){
+  const f=A.fit,b=A.bc,best=A.best,pct=Math.round(best.share*100);
+  const inc=[[1,'none'],[0.5,'√y'],[0,'log y'],[-1,'1/y']].filter(([q])=>q>=b.lo-1e-9&&q<=b.hi+1e-9).map(([,n])=>n);
+  const lamTxt=(b.loOpen?'≤ ':'')+num(b.lo)+' to '+num(b.hi)+(b.hiOpen?' or more':'');
+  let head;
+  if(pct<60)head='Inconclusive: several variance laws fit about equally well.';
+  else head='Use '+TNAME[best.id]+'.';
+  let l1;
+  if(best.id==='arc')l1='The group variances follow <b>μ(1−μ)/n</b>, the binomial pattern, so the power-law slope below is not meaningful.';
+  else l1='Spread–level slope <b>b = '+num(f.b)+'</b> (95% CI '+num(f.lo)+' to '+num(f.hi)+'), so SD ∝ μ<sup>b</sup> and the suggested power is <b>λ = 1 − b = '+num(1-f.b)+'</b>.';
+  const l2='Best-supported law: <b>'+best.name+'</b> ('+pct+'% of the support). '+(pct<60?'Widen the range of group means or add replicates to separate them.':'');
+  const l3='Box–Cox: <b>λ̂ = '+num(b.lhat)+'</b>, 95% CI '+lamTxt+'. '+(inc.length?'Inside the interval: <b>'+inc.join(', ')+'</b>.':'No standard transform lies inside the interval, so a fractional power or a different family may be needed.')+(b.shift?' (Values were shifted by '+f3(b.shift)+' so that all are positive.)':'');
+  const truth=FAMS[$('fam').value].truth;
+  $('verdict').innerHTML='<p class="big">'+head+'</p><p>'+l1+'</p><p>'+l2+'</p><p>'+l3+'</p><p>This dataset was generated to need <b>'+TNAME[truth]+'</b>. In real data you would not know that, which is why we infer it.</p>';
+}
+
+/* ---------- hover linking ---------- */
+const tip=$('tip');
+function showTip(e,g){
+  const gr=G[g];
+  tip.innerHTML='<b>Group '+(g+1)+'</b><br>mean '+f3(A.mus[g])+'<br>SD '+f3(A.sds[g])+'<br>CV '+(A.sds[g]/A.mus[g]).toFixed(2);
+  tip.style.display='block';
+  const x=Math.min(e.clientX+14,window.innerWidth-tip.offsetWidth-8),y=Math.min(e.clientY+14,window.innerHeight-tip.offsetHeight-8);
+  tip.style.left=x+'px';tip.style.top=y+'px';
+}
+let hl=null;
+function setHl(g){
+  if(hl===g)return;
+  if(hl!==null)document.querySelectorAll('[data-g="'+hl+'"]').forEach(e=>e.classList.remove('hl'));
+  hl=g;
+  if(g!==null)document.querySelectorAll('[data-g="'+g+'"]').forEach(e=>e.classList.add('hl'));
+  else tip.style.display='none';
+}
+document.addEventListener('pointermove',e=>{
+  const t=e.target.closest&&e.target.closest('[data-g]');
+  if(t){const g=+t.getAttribute('data-g');setHl(g);showTip(e,g)}else setHl(null);
+});
+
+/* ---------- wiring ---------- */
+function renderCharts(){drawData();drawSL();drawBars();drawBC();drawTiles();hl=null}
+function update(){
+  $('ok').textContent=$('k').value;$('om').textContent=$('m').value;
+  const binomial=$('fam').value==='binom';
+  $('R').disabled=binomial;$('Rlab').style.opacity=binomial?.45:1;
+  $('oR').textContent=binomial?'0.05 to 0.95':'×'+(Math.pow(10,+$('R').value)).toFixed(1);
+  generate();analyze();verdict();renderCharts();
+}
+['fam','k','m','R','seed','logy'].forEach(id=>$(id).addEventListener(id==='logy'?'change':'input',id==='logy'?()=>{drawData()}:update));
+$('resample').addEventListener('click',()=>{$('seed').value=(+$('seed').value||1)+1;update()});
+let rt=null,lastW=0;
+new ResizeObserver(()=>{const w=document.querySelector('.wrap').clientWidth;if(w===lastW)return;lastW=w;clearTimeout(rt);rt=setTimeout(()=>{if(A)renderCharts()},80)}).observe(document.querySelector('.wrap'));
+update();
+})();
+</script>
+</body>
+</html>
