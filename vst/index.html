@@ -206,7 +206,7 @@ td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
     <h2>Look at what the line leaves over</h2>
     <p class="what">The <b>residual</b> (leftover) of a dot is how far it sits above or below the line. If the noise is the same everywhere, plotting leftovers against the line's height gives a flat horizontal band. A fan or funnel, narrow on the left and wide on the right, means the noise grows with the level.</p>
     <div class="cols">
-      <div class="panel"><p class="cap">Each dot: its leftover (up/down) against the height of the line at that dot (left/right).</p><div class="chart" id="c2"></div></div>
+      <div class="panel"><p class="cap">Each dot: its leftover (up/down) against the fitted value at that dot (left/right). The fitted value is the y the line predicts there..</p><div class="chart" id="c2"></div></div>
       <div class="read" id="r2"></div>
     </div>
   </div>
@@ -217,7 +217,7 @@ td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
   <div class="num">3</div>
   <div>
     <h2>Sort the dots into bins and measure the noise in each</h2>
-    <p class="what">You cannot see how spread out data are from one dot. So we line the dots up from lowest to highest line-height and cut them into <b>bins</b> with the same number of dots in each. In every bin we measure the typical size of the leftovers (the root-mean-square, or "spread"). If you took repeated measurements at the same x values, those repeats could be your bins instead.</p>
+    <p class="what">You cannot see how spread out data are from one dot. So we line the dots up from lowest to highest <b>fitted value</b> (the y the line predicts) and cut them into <b>bins</b> with the same number of dots in each. In every bin we measure the typical size of the leftovers (the root-mean-square, or "spread"). If you took repeated measurements at the same x values, those repeats could be your bins instead.</p>
     <div class="cols">
       <div class="panel"><p class="cap">Dashed lines separate the bins. Each box shows ± one spread around zero.</p><div class="chart" id="c3"></div></div>
       <div class="read" id="r3"></div>
@@ -631,12 +631,12 @@ function drawBC(){
 }
 /* step 6 */
 function drawCheck(){
-  drawResid($('c6a'),S.f0.fitted,S.f0.res,S.bins,'height of the line (original scale)',true);
-  drawResid($('c6b'),S.after.f1.fitted,S.after.f1.res,S.after.bins,'height of the line (transformed scale)',true);
+  drawResid($('c6a'),S.f0.fitted,S.f0.res,S.bins,'fitted value (original scale)',true);
+  drawResid($('c6b'),S.after.f1.fitted,S.after.f1.res,S.after.bins,'fitted value (transformed scale)',true);
   $('cap6b').textContent='After: leftovers on the transformed scale ('+S.T.label+').';
   const B=S.bins.length,b4=S.tr0.rel.map(Math.exp),a4=S.after.tr.rel.map(Math.exp);
   const lo=Math.min(0.25,Math.min(...b4,...a4)*0.85),hi=Math.max(4,Math.max(...b4,...a4)*1.15),idx=Array.from({length:B},(_,i)=>i+1);
-  chart($('c6c'),280,{x:[0.5,B+0.5,false],y:[lo,hi,true],xt:idx.length>10?niceTicks(1,B,6):idx,xl:'bin (1 = lowest line height, '+B+' = highest)',yl:'spread ÷ typical spread',mg:{r:46},fx:v=>num(v,0),label:'Relative spread in each bin before and after the transformation',
+  chart($('c6c'),280,{x:[0.5,B+0.5,false],y:[lo,hi,true],xt:idx.length>10?niceTicks(1,B,6):idx,xl:'bin (1 = lowest fitted value, '+B+' = highest)',yl:'spread ÷ typical spread',mg:{r:46},fx:v=>num(v,0),label:'Relative spread in each bin before and after the transformation',
     marks:(X,Y)=>{
       let s='<line x1="'+X(0.5)+'" x2="'+X(B+0.5)+'" y1="'+Y(1)+'" y2="'+Y(1)+'" style="stroke:var(--muted);stroke-width:1.2"/>';
       s+='<path d="'+b4.map((q,i)=>(i?'L':'M')+X(i+1)+' '+Y(q)).join('')+'" fill="none" style="stroke:var(--c-id);stroke-width:2;stroke-dasharray:5 4"/>'+dots(idx,b4,X,Y,3.8,'fill:var(--c-id);stroke:var(--panel);stroke-width:1.5');
@@ -660,11 +660,11 @@ function readings(){
   if(S.deg===1){const sl=f.beta[1]/S.ols.xs,ic=f.beta[0]-f.beta[1]*S.ols.xm/S.ols.xs;eq='y ≈ '+f3(ic)+' '+(sl<0?'−':'+')+' '+f3(Math.abs(sl))+' · x'}else eq='a fitted curve';
   $('r1').innerHTML='<p><b>'+n+' points.</b> x runs from '+f3(Math.min(...x))+' to '+f3(Math.max(...x))+' and y from '+f3(Math.min(...y))+' to '+f3(Math.max(...y))+'.</p><p>Fitted average: <b>'+eq+'</b> (it explains '+Math.round(r2*100)+'% of the up-and-down movement in y).</p><div class="look"><b>Look for:</b> is the cloud about as thick on the left as on the right, or does it fan out? Also check that the line follows the middle of the cloud. If it does not, fix the shape of the average (step 0) before anything else.</div>';
   const t0=S.tr0;
-  $('r2').innerHTML='<p>Each dot is now measured from the line, so the line becomes the flat zero level.</p><div class="res"><b>Reading:</b> '+(t0.flat?'the band looks about the same thickness from low to high. The data may not need a transformation.':'the band changes thickness. Going from the lowest to the highest line-height, the spread changes by about <b>×'+fx(t0.factor)+'</b> (95% range ×'+fx(t0.flo)+' to ×'+fx(t0.fhi)+').')+'</div><div class="look"><b>Look for:</b> a fan shape. It means the noise depends on the level, which is exactly what a transformation can fix. A bow shape (leftovers mostly above zero in the middle, below at the ends) means the line is the wrong shape.</div>';
+  $('r2').innerHTML='<p>Each dot is now measured from the line, so the line becomes the flat zero level.</p><div class="res"><b>Reading:</b> '+(t0.flat?'the band looks about the same thickness from low to high. The data may not need a transformation.':'the band changes thickness. Going from the lowest to the highest fitted value, the spread changes by about <b>×'+fx(t0.factor)+'</b> (95% range ×'+fx(t0.flo)+' to ×'+fx(t0.fhi)+').')+'</div><div class="look"><b>Look for:</b> a fan shape. It means the noise depends on the level, which is exactly what a transformation can fix. A bow shape (leftovers mostly above zero in the middle, below at the ends) means the line is the wrong shape.</div>';
   const rows=S.bins.map((b,i)=>'<tr><td class="n">'+(i+1)+'</td><td class="n">'+b.nb+'</td><td class="n">'+f3(b.lo)+' to '+f3(b.hi)+'</td><td class="n">'+f3(b.mu)+'</td><td class="n">'+f3(mean(b.idx.map(j=>f.res[j])))+'</td><td class="n">'+f3(b.rms)+'</td><td class="n">'+(b.mu>0?(b.rms/b.mu).toFixed(2):'–')+'</td></tr>').join('');
-  $('r3').innerHTML='<div class="tbl"><table><thead><tr><th>Bin</th><th>Dots</th><th>Line height (range)</th><th>Average line height</th><th>Average leftover</th><th>Spread</th><th>Spread ÷ avg height</th></tr></thead><tbody>'+rows+'</tbody></table></div><div class="look"><b>Look for:</b> the Spread column rising as the Average line height rises. If Spread ÷ avg height stays about the same, the noise is a constant percent of the level (the log case). The Average leftover should be close to 0 in every bin. If it is not, the line misses the data there, and that miss is counted inside the Spread.</div>';
+  $('r3').innerHTML='<div class="tbl"><table><thead><tr><th>Bin</th><th>Dots</th><th>Fitted values (range)</th><th>Average fitted value</th><th>Average leftover</th><th>Spread</th><th>Spread ÷ avg fitted</th></tr></thead><tbody>'+rows+'</tbody></table></div><div class="look"><b>Look for:</b> the Spread column rising as the Average fitted value rises. If Spread ÷ avg fitted value stays about the same, the noise is a constant percent of the level (the log case). The Average leftover should be close to 0 in every bin. If it is not, the line misses the data there, and that miss is counted inside the Spread.</div>';
   /* step 4 */
-  if(!S.valid){const nneg=S.bins.filter(b=>b.mu<=0).length;$('r4').innerHTML='<p><b>The log–log version is skipped.</b> In '+nneg+' of '+S.bins.length+' bins the <em>average fitted level</em> (the height of your line there) is zero or below, and the logarithm of zero or a negative number does not exist. The spread–level rule, SD = c·level<sup>b</sup>, needs a positive level.</p><p>The leftovers themselves are fine: they can be negative, because the spread uses their squares. It is the <em>level</em> that has to be positive.</p><p>The plot on the left shows the same bins on plain axes. The red zone is where the line dips to zero or below. The hollow dots are bins inside it.</p><div class="look"><b>What to try:</b> set the shape of the average to Curve, widen the range of x, or lean on the Box–Cox result in step 5. If y really includes zero or negative values, log, √ and 1/y are not defined for them either.</div>';}
+  if(!S.valid){const nneg=S.bins.filter(b=>b.mu<=0).length;$('r4').innerHTML='<p><b>The log–log version is skipped.</b> In '+nneg+' of '+S.bins.length+' bins the <em>average fitted level</em> (what your line predicts there) is zero or below, and the logarithm of zero or a negative number does not exist. The spread–level rule, SD = c·level<sup>b</sup>, needs a positive level.</p><p>The leftovers themselves are fine: they can be negative, because the spread uses their squares. It is the <em>level</em> that has to be positive.</p><p>The plot on the left shows the same bins on plain axes. The red zone is where the line dips to zero or below. The hollow dots are bins inside it.</p><div class="look"><b>What to try:</b> set the shape of the average to Curve, widen the range of x, or lean on the Box–Cox result in step 5. If y really includes zero or negative values, log, √ and 1/y are not defined for them either.</div>';}
   else{
     const sl=S.sl,pct=Math.round(sl.best.share*100);
     const bars=sl.cands.map(c=>c.ok?'<div class="bar"><div class="lab"><b>'+c.name+'</b><small>'+c.sub+'</small></div><div class="track"><div class="fill" style="width:'+(c.share*100)+'%;background:var('+COL[c.id]+')"></div></div><div class="pct">'+(c.share<0.001?'<0.1':(c.share*100).toFixed(c.share<0.1?1:0))+'%</div></div>':'<div class="bar na"><div class="lab"><b>'+c.name+'</b><small>needs y and level between 0 and 1</small></div><div class="track"></div><div class="pct">n/a</div></div>').join('');
@@ -777,8 +777,8 @@ function math(){
 function render(){
   const q=a=>a;
   readings();drawScatter();
-  drawResid($('c2'),S.f0.fitted,S.f0.res,S.bins,'height of the line at the dot',false);
-  drawResid($('c3'),S.f0.fitted,S.f0.res,S.bins,'height of the line at the dot',true);
+  drawResid($('c2'),S.f0.fitted,S.f0.res,S.bins,'fitted value (what the line predicts)',false);
+  drawResid($('c3'),S.f0.fitted,S.f0.res,S.bins,'fitted value (what the line predicts)',true);
   drawSL();drawBC();drawCheck();
 }
 function binOptions(){const s=$('bins');for(let i=3;i<=15;i++){const o=document.createElement('option');o.value=i;o.textContent=i;s.appendChild(o)}}
