@@ -6,105 +6,114 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <title>Which Variance-Stabilizing Transform</title>
 <style>
-/* Layout: control bar, verdict, 2x2 evidence panels, row of five "after" tiles, then prose. */
+/* Layout: data input, requirements checklist, then seven numbered steps (a real sequence), each a chart beside a plain-words reading. */
 :root{
   --bg:#f6f7f9;--panel:#ffffff;--ink:#1c2230;--muted:#5b6475;--line:#dde1e8;--grid:#e9ecf1;--link:#1971c2;
   --c-data:#2a78d6;--c-id:#7d8594;--c-sqrt:#eb6834;--c-log:#1baf7a;--c-recip:#6250d6;--c-arc:#e87ba4;
+  --ok:#1a7f37;--warn:#9a6700;--bad:#c62828;
   --font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#12151b;--panel:#1a1d25;--ink:#e7eaf0;--muted:#98a2b3;--line:#2b3240;--grid:#262c38;--link:#4dabf7;
-  --c-data:#3987e5;--c-id:#8f98a8;--c-sqrt:#d95926;--c-log:#199e70;--c-recip:#9085e9;--c-arc:#d55181;color-scheme:dark}}
+  --c-data:#3987e5;--c-id:#8f98a8;--c-sqrt:#d95926;--c-log:#199e70;--c-recip:#9085e9;--c-arc:#d55181;
+  --ok:#3fb950;--warn:#e3a008;--bad:#f85149;color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#12151b;--panel:#1a1d25;--ink:#e7eaf0;--muted:#98a2b3;--line:#2b3240;--grid:#262c38;--link:#4dabf7;
-  --c-data:#3987e5;--c-id:#8f98a8;--c-sqrt:#d95926;--c-log:#199e70;--c-recip:#9085e9;--c-arc:#d55181;color-scheme:dark}
+  --c-data:#3987e5;--c-id:#8f98a8;--c-sqrt:#d95926;--c-log:#199e70;--c-recip:#9085e9;--c-arc:#d55181;
+  --ok:#3fb950;--warn:#e3a008;--bad:#f85149;color-scheme:dark}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--font)}
 .wrap{max-width:1120px;margin:0 auto;padding-block:28px 72px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .disclaimer{padding:8px 16px;font-size:13px;line-height:1.4;color:var(--muted);text-align:center;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--link) 7%,var(--bg))}
 nav.top a{color:var(--link);text-decoration:none;font-size:14px}
 h1{font-size:30px;line-height:1.15;letter-spacing:-.015em;margin:14px 0 8px;text-wrap:balance}
-h2{font-size:20px;margin:40px 0 8px;letter-spacing:-.01em;text-wrap:balance}
+h2{font-size:20px;margin:0;letter-spacing:-.01em;text-wrap:balance}
+h2.sec{margin:44px 0 8px}
 h3{font-size:15px;margin:0 0 2px}
-.lead{max-width:70ch;color:var(--muted);margin:0 0 20px}
+.lead{max-width:70ch;color:var(--muted);margin:0 0 16px}
 p,li{max-width:72ch}
 sub,sup{line-height:0}
-.eq{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13.5px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px;display:block;max-width:72ch;overflow-x:auto;margin:8px 0}
+a{color:var(--link)}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 16px}
+.box p{margin:6px 0}
+.steps-nav{display:flex;flex-wrap:wrap;gap:6px 14px;margin:14px 0 0;font-size:13px}
+.steps-nav a{text-decoration:none;color:var(--muted)}
+.steps-nav a b{color:var(--ink)}
+.steps-nav a:hover{color:var(--link)}
 
-/* controls */
-.ctl{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:end;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+/* data input */
+.ctl{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:end}
 .ctl label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);min-width:0}
 .ctl label span.v{color:var(--ink);font-variant-numeric:tabular-nums}
-.ctl select,.ctl input[type=number],.ctl button{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 8px}
-.ctl input[type=range]{width:140px;max-width:100%}
-.ctl button{cursor:pointer}
-.ctl button:hover{border-color:var(--c-data)}
+select,input[type=number],textarea,button{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 8px}
+textarea{width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.4;resize:vertical}
+input[type=range]{width:150px;max-width:100%}
+button{cursor:pointer}
+button:hover{border-color:var(--c-data)}
+button.primary{background:var(--c-data);color:#fff;border-color:var(--c-data)}
 :focus-visible{outline:2px solid var(--c-data);outline-offset:2px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-bottom:10px}
+.seg label{display:block;padding:6px 14px;font-size:14px;color:var(--ink);cursor:pointer;background:var(--bg)}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg input:checked+span{font-weight:600}
+.seg label:has(input:checked){background:color-mix(in srgb,var(--c-data) 18%,var(--bg))}
+.seg label:has(input:focus-visible){outline:2px solid var(--c-data);outline-offset:-2px}
+.row2{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:end;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.msg{font-size:13px;margin:6px 0 0;max-width:none}
+.msg.bad{color:var(--bad)}
 
-/* verdict */
-.verdict{margin:14px 0;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--c-data);border-radius:8px;padding:12px 16px}
-.verdict .big{font-size:19px;font-weight:600;letter-spacing:-.01em;margin:0 0 4px;max-width:none}
-.verdict p{margin:2px 0;color:var(--muted);max-width:none;font-size:14px}
-.verdict b{color:var(--ink);font-weight:600}
+/* requirements */
+.reqs{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px}
+.reqs li{display:grid;grid-template-columns:24px minmax(0,1fr);gap:6px;align-items:start;max-width:none;font-size:14px}
+.reqs .ic{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;font-size:12px;font-weight:700;color:var(--panel);margin-top:1px}
+.reqs .ok .ic{background:var(--ok)}.reqs .warn .ic{background:var(--warn)}.reqs .bad .ic{background:var(--bad)}
+.reqs small{display:block;color:var(--muted);font-size:12.5px}
 
-/* key */
-.key{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;margin:6px 0 12px;align-items:center}
-.key .t{color:var(--muted)}
-.key i{display:inline-block;width:18px;height:0;border-top:3px solid;vertical-align:middle;margin-right:6px}
-.key i.dash{border-top-style:dashed}
-
-/* panels */
-.panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
-@media (max-width:820px){.panels{grid-template-columns:minmax(0,1fr)}}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px 10px;min-width:0}
-.panel .cap{font-size:13px;color:var(--muted);margin:0 0 6px;max-width:none}
-.panel .head{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
-.panel .head label{font-size:12px;color:var(--muted);display:flex;gap:5px;align-items:center}
+/* steps */
+.step{display:grid;grid-template-columns:38px minmax(0,1fr);gap:0 14px;margin:30px 0 0}
+.num{width:36px;height:36px;border-radius:50%;background:var(--c-data);color:#fff;display:grid;place-items:center;font-weight:700;font-size:16px;font-variant-numeric:tabular-nums}
+.step .what{color:var(--muted);margin:4px 0 10px;max-width:74ch}
+.cols{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px;align-items:start}
+.cols.three{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width:860px){.cols,.cols.three{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px 8px;min-width:0}
+.panel .cap{font-size:12.5px;color:var(--muted);margin:0 0 4px;max-width:none}
+.read{min-width:0}
+.read p{margin:0 0 8px}
+.read .look{border-left:3px solid var(--line);padding-left:10px;color:var(--muted);font-size:14px;margin:8px 0}
+.read .res{border-left:3px solid var(--c-data);padding-left:10px;margin:8px 0}
+.read b{font-weight:600}
 .chart{width:100%;position:relative}
 svg{display:block;overflow:visible}
 svg text{font-family:var(--font);fill:var(--muted);font-size:11px}
 svg text.strong{fill:var(--ink)}
 svg .gl{stroke:var(--grid);stroke-width:1}
 svg .ax{stroke:var(--line);stroke-width:1}
-circle.hl{stroke:var(--ink);stroke-width:2}
-rect.col.hl{fill:var(--ink);fill-opacity:.07}
-
-/* support bars */
-.bars{display:grid;gap:8px;margin-top:4px}
-.bar{display:grid;grid-template-columns:minmax(0,150px) minmax(0,1fr) 54px;gap:8px;align-items:center;font-size:13px}
-.bar .lab{min-width:0}
+.tbl{overflow-x:auto;margin:6px 0}
+table{border-collapse:collapse;font-size:13.5px;min-width:100%;background:var(--panel)}
+th,td{text-align:left;padding:6px 9px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+.key{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;margin:2px 0 6px}
+.key i{display:inline-block;width:18px;height:0;border-top:3px solid;vertical-align:middle;margin-right:5px}
+.bars{display:grid;gap:7px;margin:8px 0}
+.bar{display:grid;grid-template-columns:minmax(0,140px) minmax(0,1fr) 46px;gap:8px;align-items:center;font-size:13px}
 .bar .lab small{display:block;color:var(--muted);font-size:11.5px}
-.bar .track{height:14px;background:var(--grid);border-radius:3px;overflow:hidden}
-.bar .fill{height:100%;border-radius:0 3px 3px 0;min-width:2px}
+.bar .track{height:12px;background:var(--grid);border-radius:3px;overflow:hidden}
+.bar .fill{height:100%;min-width:2px;border-radius:0 3px 3px 0}
 .bar .pct{text-align:right;font-variant-numeric:tabular-nums}
 .bar.na{opacity:.45}
-.bar.best .lab b::after{content:" ← best";color:var(--muted);font-weight:400}
-
-/* tiles */
-.tiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
-@media (max-width:980px){.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media (max-width:620px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
-.tile{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 10px 8px;min-width:0}
-.tile.flat{border-color:var(--c-log);box-shadow:inset 0 0 0 1px var(--c-log)}
-.tile h3{display:flex;justify-content:space-between;gap:6px;align-items:baseline;font-weight:600}
-.tile h3 em{font-style:normal;font-size:11px;font-weight:600;color:var(--ink);background:color-mix(in srgb,var(--c-log) 22%,var(--panel));padding:1px 6px;border-radius:10px;white-space:nowrap}
-.tile .ratio{font-size:12.5px;color:var(--muted);margin:0;max-width:none}
-.tile .ratio b{color:var(--ink);font-variant-numeric:tabular-nums}
-.note{font-size:13px;color:var(--muted);max-width:none;margin:8px 0 0}
-
-/* tables / prose */
-.tbl{overflow-x:auto;margin:8px 0}
-table{border-collapse:collapse;font-size:14px;min-width:560px;width:100%;background:var(--panel)}
-th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
-td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:1px 8px;border-radius:10px;color:var(--panel)}
+.pill.ok{background:var(--ok)}.pill.warn{background:var(--warn)}.pill.bad{background:var(--bad)}
+.concl{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--c-data);border-radius:8px;padding:14px 18px;margin-top:10px}
+.concl h3{font-size:17px;margin-bottom:6px}
+.concl ul{margin:6px 0 10px;padding-left:20px}
+.concl li{margin-bottom:6px}
 .two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 28px}
 @media (max-width:820px){.two{grid-template-columns:minmax(0,1fr)}}
 .two ul{margin:6px 0 0;padding-left:20px}
 .two li{margin-bottom:8px}
-.try{background:var(--panel);border:1px dashed var(--line);border-radius:8px;padding:10px 14px;margin-top:14px;font-size:14px;max-width:none}
-.try ol{margin:4px 0 0;padding-left:20px}
-#tip{position:fixed;z-index:20;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;line-height:1.35;padding:5px 8px;border-radius:5px;display:none;font-variant-numeric:tabular-nums;max-width:240px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -113,137 +122,202 @@ td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
 <div class="wrap">
 <nav class="top"><a href="../index.html">← Statistics visualizations</a></nav>
 <h1>Which variance-stabilizing transformation does my data call for?</h1>
-<p class="lead">You do not have to guess between √y, log y and 1/y. If your data come in groups (dose levels, time bins, bins of fitted value), the way the spread grows with the level tells you. Pick a generating process below, then watch how one dataset points to its own transformation, and how the Box–Cox profile agrees.</p>
+<p class="lead">Give this page a list of (x, y) pairs, or let it make some. It walks through the checks, one step at a time, and ends with advice on how to treat the scatter in your data.</p>
 
-<div class="try" style="margin:0 0 16px;border-style:solid"><b>In plain words</b>
-  <p style="margin:6px 0">Some data have a problem: the <em>bigger</em> the numbers, the <em>noisier</em> they are. Think of weighing things: a feather is off by a hair, a truck is off by a lot. Many statistics tools assume the noise is the same size everywhere, so we look for a re-scaling of the numbers that makes it so.</p>
-  <p style="margin:6px 0"><b>λ (lambda) is a dial</b> for that re-scaling. We raise every number to the power λ. λ = 1 leaves the data alone, λ = ½ takes square roots, λ = 0 means take the log, and λ = −1 means 1/y. Lower settings squash big numbers harder.</p>
-  <p style="margin:6px 0"><b>Why groups?</b> You can't see how spread out data are from one number. So we make piles of points that are about the same size (repeats of the same measurement, or points sorted by size and cut into piles) and measure the spread in each pile.</p>
-  <p style="margin:6px 0"><b>Two ways to find λ.</b> (2) The spread–level plot reads it from how quickly the noise grows. (4) The Box–Cox test tries every setting of the dial and scores each one. The plot of scores has a peak (the best λ, one number) and a dashed line: settings above the line are still believable. If 0, ½ or 1 is in that range, use it because it is easy to explain.</p>
-  <p style="margin:6px 0"><b>Did it work?</b> After re-scaling, we measure the spread in every pile again. A good re-scaling gives similar spread in every pile. The tile shows the biggest spread divided by the smallest ("×2.1" is good, "×12" is bad); the highlighted tile is the one whose spreads differ least.</p>
+<div class="box">
+  <b>The idea in plain words.</b>
+  <p>Some data have a problem: the <em>bigger</em> the values, the <em>noisier</em> they are. Think of weighing things: a feather is off by a hair, a truck is off by a lot. Many statistics tools assume the noise is the same size everywhere. If it is not, we can often fix that by re-scaling y with a function such as the square root or the log. That is a <b>variance-stabilizing transformation</b>. The steps below figure out which one, if any, your data need.</p>
+</div>
+<div class="steps-nav" aria-label="Steps">
+  <a href="#s0"><b>0</b> Get data</a><a href="#s1"><b>1</b> Plot</a><a href="#s2"><b>2</b> Leftovers</a><a href="#s3"><b>3</b> Bin</a><a href="#s4"><b>4</b> Spread vs level</a><a href="#s5"><b>5</b> Box–Cox</a><a href="#s6"><b>6</b> Check</a><a href="#s7"><b>7</b> Conclusion</a>
 </div>
 
-<div class="ctl" role="group" aria-label="Dataset controls">
-  <label for="fam">Where the data come from
-    <select id="fam">
-      <option value="lognormal" selected>Multiplicative error (Lognormal)</option>
-      <option value="poisson">Counts (Poisson)</option>
-      <option value="normal">Constant variance (Normal)</option>
-      <option value="recip">SD ∝ mean² (reciprocal-Normal)</option>
-      <option value="binom">Proportions (Binomial, n = 40)</option>
-    </select>
-  </label>
-  <label for="k">Groups <span class="v" id="ok"></span><input id="k" type="range" min="4" max="20" step="1" value="10"></label>
-  <label for="m">Replicates per group <span class="v" id="om"></span><input id="m" type="range" min="3" max="60" step="1" value="10"></label>
-  <label for="R" id="Rlab">Range of group means <span class="v" id="oR"></span><input id="R" type="range" min="0.1" max="2.3" step="0.05" value="1.3"></label>
-  <label for="seed">Seed<input id="seed" type="number" value="7" min="1" max="99999" style="width:80px"></label>
-  <button id="resample" type="button">Resample</button>
-</div>
+<!-- Step 0 -->
+<section id="s0" style="margin-top:26px">
+  <h2>Step 0. Get some data</h2>
+  <p class="what" style="color:var(--muted);margin:4px 0 10px">Either make a sample from a known recipe (so you can see whether the method finds the right answer), or paste your own.</p>
+  <div class="cols">
+    <div class="box">
+      <div class="seg" role="radiogroup" aria-label="Data source">
+        <label><input type="radio" name="src" value="gen" checked><span>Generate a sample</span></label>
+        <label><input type="radio" name="src" value="paste"><span>Paste my own x, y</span></label>
+      </div>
+      <div id="genbox">
+        <div class="ctl">
+          <label for="fam">Recipe for the noise
+            <select id="fam">
+              <option value="lognormal" selected>Percent error (SD ∝ mean)</option>
+              <option value="poisson">Counts (Poisson, Var ∝ mean)</option>
+              <option value="normal">Same noise everywhere</option>
+              <option value="recip">Noise grows as mean² (1/y is the stable scale)</option>
+              <option value="binom">Proportions (out of 40)</option>
+            </select>
+          </label>
+          <label for="N">Number of points N <span class="v" id="oN"></span><input id="N" type="range" min="10" max="400" step="5" value="150"></label>
+          <label for="slope" id="slopelab">How fast the average rises with x <span class="v" id="oS"></span><input id="slope" type="range" min="0.2" max="20" step="0.2" value="9"></label>
+          <label for="seed">Seed<input id="seed" type="number" value="7" min="1" max="99999" style="width:80px"></label>
+          <button id="resample" type="button">New sample</button>
+        </div>
+        <p class="msg" style="color:var(--muted)">The true average is a straight line, μ(x) = 10 + slope · x for x from 0 to 10 (for proportions: 5% rising to 95%).</p>
+      </div>
+      <div id="pastebox" hidden>
+        <label for="paste" style="font-size:12px;color:var(--muted)">One pair per line, "x, y". Commas, spaces or tabs all work. A header line is skipped.</label>
+        <textarea id="paste" rows="7" spellcheck="false"></textarea>
+        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"><button id="usepaste" type="button" class="primary">Analyze these data</button></div>
+        <p class="msg" id="pmsg" aria-live="polite"></p>
+      </div>
+      <div class="row2">
+        <label for="deg" style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px">Shape of the average
+          <select id="deg"><option value="1" selected>Straight line</option><option value="2">Curve (quadratic)</option></select></label>
+        <label for="bins" style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px">Number of bins (step 3)
+          <select id="bins"><option value="0" selected>Automatic</option></select></label>
+      </div>
+    </div>
+    <div class="box">
+      <b>Does your data meet the requirements?</b>
+      <ul class="reqs" id="reqs"></ul>
+      <p class="msg" style="color:var(--muted)">Also assumed, but not checkable here: the points are independent of each other, and there are no wild outliers.</p>
+    </div>
+  </div>
+</section>
 
-<div class="verdict" id="verdict" aria-live="polite"></div>
+<!-- Step 1 -->
+<section class="step" id="s1">
+  <div class="num">1</div>
+  <div>
+    <h2>Plot the data</h2>
+    <p class="what">Always start by looking. Draw x against y and fit the simplest line (or curve) through the cloud. The line is our guess for the <em>average</em> y at each x.</p>
+    <div class="cols">
+      <div class="panel"><p class="cap">Dots are your data. The dark line is the fitted average.</p><div class="chart" id="c1"></div></div>
+      <div class="read" id="r1"></div>
+    </div>
+  </div>
+</section>
 
-<div class="key" aria-label="Key">
-  <span class="t">Candidate variance laws and their transforms:</span>
-  <span><i style="border-color:var(--c-id)"></i>constant → none</span>
-  <span><i style="border-color:var(--c-sqrt)"></i>SD ∝ √μ → √y</span>
-  <span><i style="border-color:var(--c-log)"></i>SD ∝ μ → log y</span>
-  <span><i style="border-color:var(--c-recip)"></i>SD ∝ μ² → 1/y</span>
-  <span><i style="border-color:var(--c-arc)"></i>Var ∝ μ(1−μ) → arcsin √p</span>
-</div>
+<!-- Step 2 -->
+<section class="step" id="s2">
+  <div class="num">2</div>
+  <div>
+    <h2>Look at what the line leaves over</h2>
+    <p class="what">The <b>residual</b> (leftover) of a dot is how far it sits above or below the line. If the noise is the same everywhere, plotting leftovers against the line's height gives a flat horizontal band. A fan or funnel, narrow on the left and wide on the right, means the noise grows with the level.</p>
+    <div class="cols">
+      <div class="panel"><p class="cap">Each dot: its leftover (up/down) against the height of the line at that dot (left/right).</p><div class="chart" id="c2"></div></div>
+      <div class="read" id="r2"></div>
+    </div>
+  </div>
+</section>
 
-<div class="panels">
-  <section class="panel" aria-labelledby="hA">
-    <div class="head"><h3 id="hA">1. The data</h3><label for="logy"><input type="checkbox" id="logy"> log y-axis</label></div>
-    <p class="cap">Each column is a group. Dots are replicates, the bar is mean ± 1 SD. Does the spread change from left to right?</p>
-    <div class="chart" id="chA"></div>
-  </section>
+<!-- Step 3 -->
+<section class="step" id="s3">
+  <div class="num">3</div>
+  <div>
+    <h2>Sort the dots into bins and measure the noise in each</h2>
+    <p class="what">You cannot see how spread out data are from one dot. So we line the dots up from lowest to highest line-height and cut them into <b>bins</b> with the same number of dots in each. In every bin we measure the typical size of the leftovers (the root-mean-square, or "spread"). If you took repeated measurements at the same x values, those repeats could be your bins instead.</p>
+    <div class="cols">
+      <div class="panel"><p class="cap">Dashed lines separate the bins. Each box shows ± one spread around zero.</p><div class="chart" id="c3"></div></div>
+      <div class="read" id="r3"></div>
+    </div>
+  </div>
+</section>
 
-  <section class="panel" aria-labelledby="hB">
-    <h3 id="hB">2. Spread–level plot</h3>
-    <p class="cap">One dot per group: log SD against log mean. A straight line of slope <i>b</i> means SD ∝ μ<sup><i>b</i></sup>. The shaded band is the 95% interval for the fitted slope.</p>
-    <div class="chart" id="chB"></div>
-  </section>
+<!-- Step 4 -->
+<section class="step" id="s4">
+  <div class="num">4</div>
+  <div>
+    <h2>Does the spread grow with the level? Draw the spread–level plot</h2>
+    <p class="what">One dot per bin: the bin's average level against its spread, both on log scales. On log scales, "spread is proportional to level raised to a power b" becomes a straight line whose steepness is b. We fit that line, and also try five specific rules to see which one the dots follow best.</p>
+    <div class="key">
+      <span><i style="border-color:var(--c-id)"></i>constant → none</span>
+      <span><i style="border-color:var(--c-sqrt)"></i>SD ∝ √level → √y</span>
+      <span><i style="border-color:var(--c-log)"></i>SD ∝ level → log y</span>
+      <span><i style="border-color:var(--c-recip)"></i>SD ∝ level² → 1/y</span>
+      <span><i style="border-color:var(--c-arc)"></i>proportions → arcsin √p</span>
+    </div>
+    <div class="cols">
+      <div class="panel"><p class="cap">Blue dots are the bins. The shaded band is the 95% range for the fitted slope. The thick colored line is the best rule.</p><div class="chart" id="c4"></div></div>
+      <div class="read" id="r4"></div>
+    </div>
+  </div>
+</section>
 
-  <section class="panel" aria-labelledby="hC">
-    <h3 id="hC">3. Which variance law is best supported?</h3>
-    <p class="cap">Each law is fitted to the dots in panel 2 with only its scale free. Bars show relative support (likelihood ratio, equal prior weight).</p>
-    <div class="bars" id="bars"></div>
-  </section>
+<!-- Step 5 -->
+<section class="step" id="s5">
+  <div class="num">5</div>
+  <div>
+    <h2>Cross-check with the Box–Cox test</h2>
+    <p class="what"><b>λ (lambda)</b> is a dial for re-scaling y. Raise every y to the power λ: λ = 1 leaves y alone, λ = ½ is the square root, λ = 0 means the log, λ = −1 is 1/y. Box–Cox tries every setting of the dial and gives each one a score for "does the noise look equal-sized and bell-shaped after this re-scaling?" It does this without bins, so it is an independent second opinion.</p>
+    <div class="cols">
+      <div class="panel"><p class="cap">Score against λ. Higher is better. The peak is the best λ. Settings above the dashed line cannot be ruled out at 95%. The black diamond is the answer from step 4.</p><div class="chart" id="c5"></div></div>
+      <div class="read" id="r5"></div>
+    </div>
+  </div>
+</section>
 
-  <section class="panel" aria-labelledby="hD">
-    <h3 id="hD">4. Box–Cox profile likelihood</h3>
-    <p class="cap">A second, independent route to λ. Values of λ above the dashed line are not rejected at 95%. The diamond is the spread–level answer, λ = 1 − <i>b</i>.</p>
-    <div class="chart" id="chD"></div>
-  </section>
-</div>
+<!-- Step 6 -->
+<section class="step" id="s6">
+  <div class="num">6</div>
+  <div>
+    <h2>Apply the transformation and check that it worked</h2>
+    <p class="what">Re-scale y, fit the line again, and repeat steps 2 and 3 on the new leftovers. If the transformation did its job, the band is flat and the bins have the same spread. A good habit is to prefer an easy value like 0, ½ or 1 when it is inside the Box–Cox range.</p>
+    <div class="ctl" style="margin-bottom:10px">
+      <label for="tr">Transformation to try
+        <select id="tr">
+          <option value="rec" selected>Recommended</option><option value="none">None (λ = 1)</option><option value="sqrt">√y (λ = ½)</option><option value="log">log y (λ = 0)</option><option value="recip">1/y (λ = −1)</option><option value="arc">arcsin √p (proportions)</option><option value="pow">Other λ…</option>
+        </select></label>
+      <label for="lam" id="lamlab" hidden>λ<input id="lam" type="number" step="0.1" value="0.3" style="width:80px"></label>
+    </div>
+    <div class="cols three">
+      <div class="panel"><p class="cap">Before: leftovers on the original scale.</p><div class="chart" id="c6a"></div></div>
+      <div class="panel"><p class="cap" id="cap6b">After: leftovers on the transformed scale.</p><div class="chart" id="c6b"></div></div>
+    </div>
+    <div class="cols" style="margin-top:14px">
+      <div class="panel"><p class="cap">Spread in each bin, relative to the typical bin (log scale, 1 = typical). Flat means the noise is equal everywhere.</p><div class="chart" id="c6c"></div></div>
+      <div class="read" id="r6"></div>
+    </div>
+  </div>
+</section>
 
-<h2>Did it work? SD of each group after transforming</h2>
-<p class="lead" style="margin-bottom:10px">Each tile transforms the same data and plots every group's SD relative to the typical SD (log scale, 1 = typical). A stabilizing transform gives a flat row of dots near 1.</p>
-<div class="tiles" id="tiles"></div>
-<p class="note" id="tilenote"></p>
+<!-- Step 7 -->
+<section class="step" id="s7">
+  <div class="num">7</div>
+  <div>
+    <h2>Conclusion: how to treat the scatter in your data</h2>
+    <div class="concl" id="r7"></div>
+  </div>
+</section>
 
-<div class="try"><b>Try this</b>
-  <ol>
-    <li>Switch the data source and see the verdict change from √y to log y to 1/y to arcsin √p.</li>
-    <li>Drag <b>Range of group means</b> down to about 1.3×. With the means almost equal there is no way to tell the laws apart, and the verdict says so.</li>
-    <li>Drag <b>Replicates per group</b> down to 3. Each SD is noisy, so the slope's interval widens.</li>
-    <li>Tick <b>log y-axis</b> for the lognormal data: the funnel becomes a tube.</li>
-  </ol>
-</div>
-
-<h2>How the inference works</h2>
-<p>The delta method says that if SD(Y) = h(μ) then a transform g has constant variance when g′(μ) ∝ 1/h(μ). So the shape of h tells you g. We estimate h from the data in three steps.</p>
-<ol>
-  <li><b>Make groups with similar means.</b> Replicates at each dose, time or condition work directly. With a regression and no replicates, fit the model first and bin by fitted value; the residual SD in each bin plays the same role.</li>
-  <li><b>Plot log SD against log mean.</b> If SD = c·μ<sup>b</sup> then log SD = log c + <i>b</i> log μ, a straight line with slope <i>b</i>.</li>
-  <li><b>Integrate.</b> g(y) = ∫ dy / y<sup>b</sup> = y<sup>1−b</sup> (or log y when b = 1). In Box–Cox terms, λ = 1 − <i>b</i>. This is Tukey's spread-versus-level rule.</li>
-</ol>
-<div class="tbl"><table>
-  <thead><tr><th>Slope b</th><th>Variance law</th><th>λ = 1 − b</th><th>Transform</th><th>Typical data</th></tr></thead>
-  <tbody>
-    <tr><td class="n">0</td><td>Var constant</td><td class="n">1</td><td>none</td><td>Well-behaved measurements</td></tr>
-    <tr><td class="n">½</td><td>Var ∝ μ</td><td class="n">½</td><td>√y</td><td>Poisson counts</td></tr>
-    <tr><td class="n">1</td><td>SD ∝ μ (Var ∝ μ²)</td><td class="n">0</td><td>log y</td><td>Multiplicative errors, concentrations, fluxes</td></tr>
-    <tr><td class="n">2</td><td>Var ∝ μ⁴</td><td class="n">−1</td><td>1/y</td><td>Rare, strongly skewed</td></tr>
-    <tr><td class="n">curved</td><td>Var ∝ μ(1−μ)/n</td><td class="n">–</td><td>arcsin √p</td><td>Proportions</td></tr>
-  </tbody>
-</table></div>
-<p>The spread–level fit uses the group SDs only, while Box–Cox uses the whole sample and also asks for roughly normal residuals. When they agree, as in the verdict above, you can trust the choice. When they disagree, the data are usually skewed without the variance depending on the mean, or the groups are too few.</p>
-
-<h2>When is this useful?</h2>
+<h2 class="sec">When is this useful?</h2>
 <div class="two">
   <div>
     <h3>Use it to…</h3>
     <ul>
-      <li><b>Choose the scale before OLS, ANOVA or a t-test.</b> The assumption is equal variance on the scale you analyze. A funnel in the residuals-versus-fitted plot is the cue to run this.</li>
-      <li><b>Pick a model family from the data.</b> b ≈ ½ points to Poisson-like noise, b ≈ 1 to a gamma or lognormal model, a hump in μ(1−μ) to a binomial one. You might then fit a GLM instead of transforming.</li>
-      <li><b>Make plots and distances fair.</b> Heatmaps, PCA and clustering of counts (RNA-seq, photon counts, image pixels) let high-level rows dominate until the noise is stabilized. Magnitudes in astronomy are log flux for the same reason.</li>
-      <li><b>Compare groups on one yardstick.</b> After stabilizing, one pooled SD describes every group, so effect sizes, confidence intervals and power calculations are consistent across levels.</li>
-      <li><b>Choose weights.</b> If you keep the original scale, weighted least squares with weights ∝ 1/μ<sup>2b</sup> uses the same estimate of <i>b</i>.</li>
-      <li><b>Set a tolerance for an assay or instrument.</b> A constant CV (b ≈ 1) says the error is relative, a constant SD says it is absolute.</li>
+      <li><b>Choose the scale before OLS, ANOVA or a t-test.</b> They assume equal noise on the scale you analyze. A funnel in the residual plot is the cue.</li>
+      <li><b>Pick a model family.</b> Slope b ≈ ½ points to Poisson-like noise, b ≈ 1 to a gamma or lognormal model, proportions to a binomial one. You may then fit a GLM instead of transforming.</li>
+      <li><b>Make plots and distances fair.</b> Heatmaps, PCA and clustering of counts (RNA-seq, photon counts, image pixels) let high-level rows dominate until the noise is stabilized. Astronomers use magnitudes (log flux) for the same reason.</li>
+      <li><b>Compare groups on one yardstick.</b> After stabilizing, one pooled SD describes every group, so intervals and power calculations are consistent.</li>
+      <li><b>Choose weights.</b> On the original scale, weighted least squares with weights ∝ 1/level<sup>2b</sup> uses the same b.</li>
     </ul>
   </div>
   <div>
     <h3>Be careful when…</h3>
     <ul>
-      <li><b>The means barely differ.</b> Without a wide range of levels, every law fits. Panel 3 will show it.</li>
-      <li><b>There is a noise floor plus proportional error.</b> The spread–level plot then bends: flat at low levels and rising at high levels. No single power fits; look at asinh or a generalized log.</li>
-      <li><b>Counts are small or contain many zeros.</b> √(y + 3/8) helps, but a Poisson or negative-binomial GLM is usually better.</li>
-      <li><b>You need the mean on the original scale.</b> Back-transforming gives medians, not means, unless corrected.</li>
-      <li><b>Groups have few replicates or outliers.</b> A group SD from 3 values is itself very noisy (about ±50%), and one outlier can move the whole slope.</li>
-      <li><b>The variance depends on something other than the mean</b>, such as time or batch. Transforming does not fix that.</li>
+      <li><b>The averages barely differ.</b> Without a wide range of levels, every rule fits equally well. Step 0 will warn you.</li>
+      <li><b>There is a noise floor plus percent error.</b> The spread–level dots then bend: flat at low levels and rising at high levels. No single power fits; look at asinh or a generalized log.</li>
+      <li><b>Counts are small or have many zeros.</b> A Poisson or negative-binomial GLM is usually better than transforming.</li>
+      <li><b>You need the average on the original scale.</b> Back-transforming gives medians, not means, unless corrected.</li>
+      <li><b>The line is the wrong shape.</b> A curved relationship fitted with a straight line leaves leftovers that look like noise. Fix the average first.</li>
+      <li><b>Noise depends on something other than the level</b>, such as time or batch. Transforming does not fix that.</li>
     </ul>
   </div>
 </div>
 </div>
-<div id="tip" role="tooltip"></div>
 
 <script>
 (function(){
 'use strict';
 const $=id=>document.getElementById(id);
 const mean=a=>a.reduce((s,x)=>s+x,0)/a.length;
-const sdev=a=>{const m=mean(a);return Math.sqrt(a.reduce((s,x)=>s+(x-m)*(x-m),0)/(a.length-1))};
+const sdev=a=>{if(a.length<2)return 0;const m=mean(a);return Math.sqrt(a.reduce((s,x)=>s+(x-m)*(x-m),0)/(a.length-1))};
 
 /* ---------- random numbers ---------- */
 function rng(seed){let a=seed>>>0;return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
@@ -252,295 +326,386 @@ function N(){if(spare!==null){const s=spare;spare=null;return s}let u=0;while(!u
 function pois(mu){let tot=0;while(mu>0){const c=Math.min(mu,15);mu-=c;const L=Math.exp(-c);let k=0,p=1;do{k++;p*=U()}while(p>L);tot+=k-1}return tot}
 function binom(n,p){let s=0;for(let i=0;i<n;i++)if(U()<p)s++;return s}
 
-/* ---------- generating processes ---------- */
+/* ---------- generating recipes: true average mu(x), x in [0,10] ---------- */
 const NB=40;
 const FAMS={
-  normal:   {mu0:50, setup:()=>({s:6}),                   draw:(mu,p)=>mu+p.s*N(), truth:'id'},
-  poisson:  {mu0:8,  setup:()=>({}),                      draw:mu=>pois(mu), truth:'sqrt'},
-  lognormal:{mu0:10, setup:()=>({}),                      draw:mu=>mu*Math.exp(0.3*N()-0.045), truth:'log'},
-  recip:    {mu0:10, setup:(mu0,mx)=>({tau:0.2/mx,mx}),   draw:(mu,p)=>1/Math.max(1/mu+p.tau*N(),0.05/p.mx), truth:'recip'},
-  binom:    {binom:true, setup:()=>({}),                  draw:mu=>binom(NB,mu)/NB, truth:'arc'}
+  normal:   {mu:(x,s)=>10+s*x, setup:(s)=>({sd:0.15*(10+5*s)}),  draw:(mu,p)=>mu+p.sd*N(), truth:'none'},
+  poisson:  {mu:(x,s)=>10+s*x, setup:()=>({}),                  draw:mu=>pois(mu), truth:'sqrt'},
+  lognormal:{mu:(x,s)=>10+s*x, setup:()=>({}),                  draw:mu=>mu*Math.exp(0.3*N()-0.045), truth:'log'},
+  recip:    {mu:(x,s)=>1/(0.1*(1-(1-1/(1+s))*x/10)), setup:(s)=>({tau:0.02/(1+s),mx:10*(1+s)}), draw:(mu,p)=>1/Math.max(1/mu+p.tau*N(),0.05/p.mx), truth:'recip'},
+  binom:    {mu:(x)=>0.05+0.09*x, setup:()=>({}),               draw:mu=>binom(NB,mu)/NB, truth:'arc'}
 };
-
-/* ---------- the five candidate laws / transforms ---------- */
+const TNAME={none:'no transformation (λ = 1)',sqrt:'√y (λ = ½)',log:'log y (λ = 0)',recip:'1/y (λ = −1)',arc:'arcsin √p',pow:'a power of y'};
+const COL={none:'--c-id',sqrt:'--c-sqrt',log:'--c-log',recip:'--c-recip',arc:'--c-arc',pow:'--c-data'};
 const CANDS=[
-  {id:'id',   name:'Constant variance', sub:'SD ∝ μ⁰ → no transform',   color:'--c-id',   lnh:x=>0,        lam:'λ = 1',   g:y=>y},
-  {id:'sqrt', name:'SD ∝ √μ',          sub:'Var ∝ μ → √y',             color:'--c-sqrt', lnh:x=>0.5*x,    lam:'λ = ½',   g:y=>Math.sqrt(y)},
-  {id:'log',  name:'SD ∝ μ',           sub:'constant CV → log y',      color:'--c-log',  lnh:x=>x,        lam:'λ = 0',   g:y=>Math.log(y)},
-  {id:'recip',name:'SD ∝ μ²',          sub:'Var ∝ μ⁴ → 1/y',           color:'--c-recip',lnh:x=>2*x,      lam:'λ = −1',  g:y=>-1/y},
-  {id:'arc',  name:'Var ∝ μ(1−μ)',     sub:'proportions → arcsin √p',  color:'--c-arc',  lnh:null,        lam:'',        g:y=>Math.asin(Math.sqrt(Math.min(1,Math.max(0,y))))}
+  {id:'none', name:'Constant noise',   sub:'SD ∝ level⁰ → none',      lnh:x=>0},
+  {id:'sqrt', name:'SD ∝ √level',      sub:'Var ∝ level → √y',        lnh:x=>0.5*x},
+  {id:'log',  name:'SD ∝ level',       sub:'constant % error → log y',lnh:x=>x},
+  {id:'recip',name:'SD ∝ level²',      sub:'Var ∝ level⁴ → 1/y',      lnh:x=>2*x},
+  {id:'arc',  name:'Var ∝ μ(1−μ)',     sub:'proportions → arcsin √p', lnh:null}
 ];
-const TNAME={id:'no transform (λ = 1)',sqrt:'√y (λ = ½)',log:'log y (λ = 0)',recip:'1/y (λ = −1)',arc:'arcsin √p'};
-const TILELAB={id:'none  (λ = 1)',sqrt:'√y  (λ = ½)',log:'log y  (λ = 0)',recip:'1/y  (λ = −1)',arc:'arcsin √p'};
-const css=n=>'var('+n+')';
 
-let G=[],A=null,Rval=20;
+/* ---------- number formatting ---------- */
+const num=(v,d=2)=>{const r=Math.round(v*Math.pow(10,d))/Math.pow(10,d);return (Object.is(r,-0)?0:r).toString().replace('-','−')};
+const f3=v=>{const a=Math.abs(v);const s=a>=1000?v.toFixed(0):a>=100?v.toFixed(0):a>=10?v.toFixed(1):a>=1?v.toFixed(2):a===0?'0':v.toPrecision(2);return s.replace(/(\.\d*?)0+$/,'$1').replace(/\.$/,'').replace('-','−')};
+const fx=v=>v>=100?v.toFixed(0):v>=10?v.toFixed(1):v.toFixed(2);
 
-function generate(){
-  const fam=FAMS[$('fam').value],k=+$('k').value,m=+$('m').value;
-  Rval=Math.pow(10,+$('R').value);
-  U=rng(+$('seed').value||1);spare=null;
-  const mx=fam.binom?1:fam.mu0*Rval,p=fam.setup(fam.mu0,mx);
-  G=[];
-  for(let i=0;i<k;i++){
-    const mu=fam.binom?0.05+0.9*i/(k-1):fam.mu0*Math.pow(Rval,i/(k-1));
-    const y=[],j=[];for(let r=0;r<m;r++){y.push(fam.draw(mu,p));j.push(U()-0.5)}
-    G.push({mu,y,j});
+/* ---------- linear algebra: least squares with a polynomial mean ---------- */
+function invert(A){
+  const n=A.length,M=A.map((r,i)=>r.concat(Array.from({length:n},(_,j)=>i===j?1:0)));
+  for(let c=0;c<n;c++){
+    let p=c;for(let r=c+1;r<n;r++)if(Math.abs(M[r][c])>Math.abs(M[p][c]))p=r;
+    [M[c],M[p]]=[M[p],M[c]];const d=M[c][c]||1e-12;
+    for(let j=0;j<2*n;j++)M[c][j]/=d;
+    for(let r=0;r<n;r++)if(r!==c){const f=M[r][c];if(f)for(let j=0;j<2*n;j++)M[r][j]-=f*M[c][j]}
   }
+  return M.map(r=>r.slice(n));
+}
+function makeOLS(x,deg){
+  const n=x.length,p=deg+1,xm=mean(x),xs=sdev(x)||1;
+  const Bm=x.map(v=>{const u=(v-xm)/xs,r=[1];for(let d=1;d<=deg;d++)r.push(r[d-1]*u);return r});
+  const A=Array.from({length:p},()=>new Array(p).fill(0));
+  Bm.forEach(r=>{for(let i=0;i<p;i++)for(let j=0;j<p;j++)A[i][j]+=r[i]*r[j]});
+  const inv=invert(A);
+  function fit(z){
+    const t=new Array(p).fill(0);Bm.forEach((r,i)=>{for(let j=0;j<p;j++)t[j]+=r[j]*z[i]});
+    const beta=inv.map(row=>row.reduce((s,v,j)=>s+v*t[j],0));
+    const fitted=Bm.map(r=>r.reduce((s,v,j)=>s+v*beta[j],0));
+    const res=z.map((v,i)=>v-fitted[i]);
+    const rss=res.reduce((s,v)=>s+v*v,0);
+    return{beta,fitted,res,rss,sigma2:rss/Math.max(1,n-p)};
+  }
+  return{fit,inv,p,xm,xs};
+}
+
+/* ---------- binning and trend ---------- */
+function makeBins(fitted,res,B){
+  const n=fitted.length,order=fitted.map((_,i)=>i).sort((a,b)=>fitted[a]-fitted[b]);
+  const base=Math.floor(n/B),extra=n%B,bins=[];let pos=0;
+  for(let b=0;b<B;b++){
+    const sz=base+(b<extra?1:0),idx=order.slice(pos,pos+sz);pos+=sz;
+    const fv=idx.map(i=>fitted[i]);
+    bins.push({idx,nb:sz,lo:Math.min(...fv),hi:Math.max(...fv),mu:mean(fv),rms:Math.max(1e-12,Math.sqrt(mean(idx.map(i=>res[i]*res[i]))))});
+  }
+  return bins;
+}
+function trend(bins){
+  const B=bins.length,ls=bins.map(b=>Math.log(b.rms)),xi=bins.map((_,i)=>i);
+  const mx=mean(xi),ml=mean(ls),Sxx=xi.reduce((s,a)=>s+(a-mx)*(a-mx),0);
+  const slope=xi.reduce((s,a,i)=>s+(a-mx)*(ls[i]-ml),0)/Sxx;
+  const sse=xi.reduce((s,a,i)=>{const r=ls[i]-(ml+slope*(a-mx));return s+r*r},0);
+  const nbMin=Math.min(...bins.map(b=>b.nb)),sTh=Math.sqrt(1/(2*nbMin)),sEmp=B>2?Math.sqrt(sse/(B-2)):sTh;
+  const se=Math.max(sTh,sEmp)/Math.sqrt(Sxx),span=B-1;
+  return{slope,se,factor:Math.exp(slope*span),flo:Math.exp((slope-1.96*se)*span),fhi:Math.exp((slope+1.96*se)*span),flat:Math.abs(slope)<1.96*se,rel:ls.map(q=>q-ml)};
+}
+
+/* ---------- data ---------- */
+let D={x:[],y:[]},S=null;
+function modeGen(){return document.querySelector('input[name=src]:checked').value==='gen'}
+function generate(){
+  const fam=FAMS[$('fam').value],n=+$('N').value,s=+$('slope').value;
+  U=rng(+$('seed').value||1);spare=null;
+  const p=fam.setup(s),xs=[];for(let i=0;i<n;i++)xs.push(10*U());xs.sort((a,b)=>a-b);
+  D={x:xs,y:xs.map(x=>fam.draw(fam.mu(x,s),p))};
+  $('paste').value='x, y\n'+D.x.map((x,i)=>x.toFixed(3)+', '+(+D.y[i].toPrecision(6))).join('\n');
+}
+function parsePaste(){
+  const lines=$('paste').value.split(/\r?\n/),x=[],y=[];let bad=0;
+  lines.forEach(l=>{l=l.trim();if(!l)return;const t=l.split(/[,\s;]+/).filter(Boolean).map(Number);if(t.length>=2&&isFinite(t[0])&&isFinite(t[1])){x.push(t[0]);y.push(t[1])}else if(x.length)bad++});
+  if(x.length<6){return{err:'Found only '+x.length+' usable (x, y) rows. Need at least 6, and 30 or more is better.'}}
+  if(new Set(x).size<3)return{err:'x needs at least 3 different values.'};
+  const o=x.map((_,i)=>i).sort((a,b)=>x[a]-x[b]);
+  return{x:o.map(i=>x[i]),y:o.map(i=>y[i]),bad};
 }
 
 /* ---------- analysis ---------- */
-function analyze(){
-  const k=G.length,m=G[0].y.length;
-  const all=G.flatMap(g=>g.y);
-  const mn=Math.min(...all);
-  let shift=0;
-  if(mn<=0){const mp=Math.min(...all.filter(v=>v>0));shift=mp/2-mn}
-  const mus=G.map(g=>mean(g.y)),sds=G.map(g=>sdev(g.y));
-  const x=mus.map(Math.log),v=sds.map(Math.log);
-  const mx=mean(x),mv=mean(v);
-  const Sxx=x.reduce((s,a)=>s+(a-mx)*(a-mx),0)||1e-9;
-  const b=x.reduce((s,a,i)=>s+(a-mx)*(v[i]-mv),0)/Sxx,a0=mv-b*mx;
-  const sse=x.reduce((s,a,i)=>{const r=v[i]-(a0+b*a);return s+r*r},0);
-  const sTh=Math.sqrt(1/(2*(m-1))),sEmp=k>2?Math.sqrt(sse/(k-2)):sTh;
-  const se=Math.max(sTh,sEmp)/Math.sqrt(Sxx);
-  const fit={b,a0,se,lo:b-1.96*se,hi:b+1.96*se,mx,mv};
-  /* candidate laws */
-  const arcOK=mus.every(u=>u>0&&u<1);
-  const cands=CANDS.map(c=>{
-    if(c.id==='arc'&&!arcOK)return{...c,ok:false};
-    const lnh=c.id==='arc'?mus.map(u=>0.5*Math.log(u*(1-u))):x.map(c.lnh);
-    const r=v.map((vi,i)=>vi-lnh[i]),cc=mean(r);
-    const s=r.reduce((t,q)=>t+(q-cc)*(q-cc),0);
-    return{...c,ok:true,cc,sse:s,rms:Math.sqrt(s/k)};
-  });
-  const okc=cands.filter(c=>c.ok),smin=Math.min(...okc.map(c=>c.sse));
-  let tot=0;okc.forEach(c=>{c.w=Math.exp(-(c.sse-smin)*(m-1));tot+=c.w});
-  okc.forEach(c=>c.share=c.w/tot);
-  const best=okc.reduce((p,c)=>c.share>p.share?c:p);
-  /* Box-Cox profile for the one-way (group-means) model */
-  const ys=G.map(g=>g.y.map(q=>q+shift)),n=all.length;
-  const sumLog=ys.flat().reduce((s,q)=>s+Math.log(q),0);
-  const lams=[],ll=[];
-  for(let L=-3;L<=3.0001;L+=0.05){
-    const lam=Math.abs(L)<1e-9?0:L;
-    const t=q=>lam===0?Math.log(q):(Math.pow(q,lam)-1)/lam;
-    let rss=0;ys.forEach(grp=>{const z=grp.map(t),zm=mean(z);z.forEach(q=>{rss+=(q-zm)*(q-zm)})});
-    lams.push(lam);ll.push(-(n/2)*Math.log(rss/n)+(lam-1)*sumLog);
+function mkT(id,lam){
+  if(id==='arc')return{id,lam:null,label:TNAME.arc,g:y=>Math.asin(Math.sqrt(Math.min(1,Math.max(0,y))))};
+  const L=id==='none'?1:id==='sqrt'?0.5:id==='log'?0:id==='recip'?-1:lam;
+  const g=L===1?(y=>y):L===0?Math.log:(y=>(Math.pow(y,L)-1)/L);
+  return{id,lam:L,g,label:id==='pow'?'y to the power '+num(L,2):TNAME[id]};
+}
+function run(){
+  const x=D.x,y=D.y,n=x.length,deg=+$('deg').value;
+  const mn=Math.min(...y);let shift=0;
+  if(mn<=0){const pos=y.filter(v=>v>0);shift=(pos.length?Math.min(...pos):1)/2-mn}
+  const yp=y.map(v=>v+shift),ols=makeOLS(x,deg),f0=ols.fit(y);
+  const Bsel=+$('bins').value,B=Bsel||Math.max(3,Math.min(10,Math.floor(n/10)));
+  const bins=makeBins(f0.fitted,f0.res,Math.min(B,Math.floor(n/2)));
+  const tr0=trend(bins);
+  /* spread-level */
+  const valid=bins.every(b=>b.mu>0);
+  let sl=null;
+  if(valid){
+    const k=bins.length,xl=bins.map(b=>Math.log(b.mu)),vl=bins.map(b=>Math.log(b.rms));
+    const mx=mean(xl),mv=mean(vl),Sxx=xl.reduce((s,a)=>s+(a-mx)*(a-mx),0)||1e-9;
+    const b=xl.reduce((s,a,i)=>s+(a-mx)*(vl[i]-mv),0)/Sxx;
+    const sse=xl.reduce((s,a,i)=>{const r=vl[i]-(mv+b*(a-mx));return s+r*r},0);
+    const nbMin=Math.min(...bins.map(q=>q.nb)),nbAvg=mean(bins.map(q=>q.nb)),sTh=Math.sqrt(1/(2*nbMin)),sEmp=k>2?Math.sqrt(sse/(k-2)):sTh;
+    const se=Math.max(sTh,sEmp)/Math.sqrt(Sxx);
+    const arcOK=bins.every(q=>q.mu<1)&&y.every(v=>v>=0&&v<=1);
+    const cands=CANDS.map(c=>{
+      if(c.id==='arc'&&!arcOK)return{...c,ok:false};
+      const lnh=c.id==='arc'?bins.map(q=>0.5*Math.log(q.mu*(1-q.mu))):xl.map(c.lnh);
+      const r=vl.map((v,i)=>v-lnh[i]),cc=mean(r),s=r.reduce((t,q)=>t+(q-cc)*(q-cc),0);
+      return{...c,ok:true,cc,sse:s,rms:Math.sqrt(s/k)};
+    });
+    const okc=cands.filter(c=>c.ok),smin=Math.min(...okc.map(c=>c.sse));let tot=0;
+    okc.forEach(c=>{c.w=Math.exp(-(c.sse-smin)*nbAvg);tot+=c.w});okc.forEach(c=>c.share=c.w/tot);
+    sl={xl,vl,mx,mv,b,se,lo:b-1.96*se,hi:b+1.96*se,cands,best:okc.reduce((p,c)=>c.share>p.share?c:p),sTh,arcOK};
   }
-  const lmax=Math.max(...ll),ih=ll.indexOf(lmax),cut=lmax-1.92;
-  const inside=ll.map(q=>q>=cut);
-  let iLo=ih,iHi=ih;while(iLo>0&&inside[iLo-1])iLo--;while(iHi<ll.length-1&&inside[iHi+1])iHi++;
-  const bc={lams,ll:ll.map(q=>q-lmax),lhat:lams[ih],lo:lams[iLo],hi:lams[iHi],loOpen:iLo===0,hiOpen:iHi===ll.length-1,shift};
-  /* after-transform tiles */
-  const tiles=CANDS.map(c=>{
-    if(c.id==='arc'&&!all.every(q=>q>=0&&q<=1))return{...c,ok:false};
-    const s=ys.map(grp=>sdev(grp.map(c.g)));
-    const ls=s.map(Math.log),lm=mean(ls);
-    const rel=ls.map(q=>q-lm);
-    const wob=Math.sqrt(mean(rel.map(q=>q*q)));
-    return{...c,ok:true,rel,ratio:Math.exp(Math.max(...ls)-Math.min(...ls)),wob};
-  });
-  const flat=tiles.filter(t=>t.ok).reduce((p,t)=>t.wob<p.wob?t:p);
-  A={k,m,mus,sds,x,v,fit,cands,best,bc,tiles,flat,shift,arcOK,sTh};
+  /* Box-Cox on the regression */
+  const sumLog=yp.reduce((s,q)=>s+Math.log(q),0),lams=[],ll=[];
+  for(let L=-3;L<=3.0001;L+=0.05){
+    const lam=Math.abs(L)<1e-9?0:L,t=q=>lam===0?Math.log(q):(Math.pow(q,lam)-1)/lam;
+    const r=ols.fit(yp.map(t));lams.push(lam);ll.push(-(n/2)*Math.log(r.rss/n)+(lam-1)*sumLog);
+  }
+  const lmax=Math.max(...ll),ih=ll.indexOf(lmax),cut=lmax-1.92,ins=ll.map(q=>q>=cut);
+  let iLo=ih,iHi=ih;while(iLo>0&&ins[iLo-1])iLo--;while(iHi<ll.length-1&&ins[iHi+1])iHi++;
+  const bc={lams,ll:ll.map(q=>q-lmax),lhat:lams[ih],lo:lams[iLo],hi:lams[iHi],loOpen:iLo===0,hiOpen:iHi===ll.length-1};
+  /* recommendation */
+  let rec;
+  const allProp=y.every(v=>v>=0&&v<=1);
+  if(sl&&sl.best.id==='arc'&&sl.best.share>=0.6)rec=mkT('arc');
+  else{
+    const inBC=q=>q>=bc.lo-1e-9&&q<=bc.hi+1e-9,inSL=q=>sl&&q>=1-sl.hi-1e-9&&q<=1-sl.lo+1e-9;
+    const mid=sl?(bc.lhat+(1-sl.b))/2:bc.lhat;
+    const std=[[1,'none'],[0.5,'sqrt'],[0,'log'],[-1,'recip']].map(([q,id])=>({q,id,sc:(inBC(q)&&(!sl||inSL(q))?2:(inBC(q)||inSL(q))?1:0)})).filter(c=>c.sc>0)
+      .sort((a,b)=>b.sc-a.sc||Math.abs(a.q-mid)-Math.abs(b.q-mid));
+    rec=std.length?mkT(std[0].id):mkT('pow',Math.round(mid*10)/10);
+  }
+  S={n,deg,ols,shift,yp,f0,bins,tr0,sl,bc,rec,valid,allProp,sumLog};
+  checks();pickTransform();
+}
+function pickTransform(){
+  const v=$('tr').value;$('lamlab').hidden=v!=='pow';
+  S.T=v==='rec'?S.rec:mkT(v,+$('lam').value);
+  const T=S.T,z=(T.id==='arc'?S.f0.fitted.map((_,i)=>D.y[i]):S.yp).map(T.g);
+  const f1=S.ols.fit(z);
+  S.after={z,f1,bins:makeBins(f1.fitted,f1.res,S.bins.length)};
+  S.after.tr=trend(S.after.bins);
 }
 
-/* ---------- drawing helpers ---------- */
-const f3=v=>{const s=Math.abs(v)>=1000?v.toFixed(0):Math.abs(v)>=100?v.toFixed(0):Math.abs(v)>=10?v.toFixed(1):Math.abs(v)>=1?v.toFixed(2):v.toPrecision(2);return s.replace(/\.0+$/,'')};
-const num=v=>(Math.round(v*100)/100).toString().replace('-','−');
+/* ---------- requirements checklist ---------- */
+function checks(){
+  const L=[],n=S.n,bins=S.bins,nbMin=Math.min(...bins.map(b=>b.nb));
+  const add=(st,t,d)=>L.push({st,t,d});
+  add(n>=50?'ok':n>=30?'warn':'bad','Sample size: '+n+' points','Want at least 30; 50 or more is comfortable. With fewer, the spread in each bin is too noisy to read.');
+  add(nbMin>=8?'ok':nbMin>=5?'warn':'bad','Points per bin: '+nbMin+(bins.length>1?' (in '+bins.length+' bins)':''),'Aim for 8 or more per bin. A spread measured from 8 dots is only good to about ±25%; from 3 dots, about ±50%.');
+  add(bins.length>=5?'ok':bins.length>=4?'warn':'bad','Number of bins: '+bins.length,'Want 5 or more so you can see a trend, not just two points.');
+  if(S.valid){const r=bins[bins.length-1].mu/bins[0].mu;
+    add(r>=3?'ok':r>=1.5?'warn':'bad','Range of the average: highest is ×'+fx(r)+' the lowest','Want at least ×3. If the average barely changes, the spread has nothing to track and every rule fits equally well.');
+  }else add('bad','Range of the average: some fitted values are zero or negative','The log-log plot in step 4 needs positive levels, so it is skipped. Box–Cox in step 5 still works.');
+  const mn=Math.min(...D.y);
+  add(mn>0?'ok':'warn',mn>0?'All y values are positive':'Some y values are zero or negative','Log, 1/y and Box–Cox need y > 0.'+(mn>0?'':' Here all y were shifted up by '+f3(S.shift)+' for steps 5 and 6. A shifted log is a different model, so be cautious.'));
+  if(S.n>=6){
+    const o2=makeOLS(D.x,2),r2=o2.fit(D.y),t=r2.beta[2]/Math.sqrt(r2.sigma2*o2.inv[2][2]);
+    if(S.deg===1)add(Math.abs(t)>3?'warn':'ok',Math.abs(t)>3?'The average looks curved, not straight':'A straight line fits the average well','A bent relationship fitted by a straight line leaves leftovers that look like extra noise. '+(Math.abs(t)>3?'Switch "Shape of the average" to Curve, then re-read the steps.':'(Check: curve term z-score '+num(t,1)+'.)'));
+    else add('ok','Using a curved average','Make sure the curve is really needed, otherwise it can soak up noise.');
+  }
+  S.reqs=L;
+  $('reqs').innerHTML=L.map(q=>'<li class="'+q.st+'"><span class="ic" aria-hidden="true">'+(q.st==='ok'?'✓':q.st==='warn'?'!':'✕')+'</span><span><b>'+q.t+'</b> <span class="sr" style="position:absolute;left:-9999px">'+(q.st==='ok'?'(passes)':q.st==='warn'?'(warning)':'(fails)')+'</span><small>'+q.d+'</small></span></li>').join('');
+}
+
+/* ---------- chart helpers ---------- */
 function niceTicks(lo,hi,n){const span=hi-lo,raw=span/n,p=Math.pow(10,Math.floor(Math.log10(raw))),f=raw/p;const st=(f<1.5?1:f<3?2:f<7?5:10)*p;const t=[];for(let q=Math.ceil(lo/st-1e-9)*st;q<=hi+1e-9;q+=st)t.push(+q.toPrecision(12));return t}
 function logTicks(lo,hi){
-  const dec=Math.log10(hi/lo);
-  let mults=dec>2.2?[1]:dec>0.9?[1,2,5]:[1,2,3,4,5,6,8];
-  const t=[];
-  for(let d=Math.floor(Math.log10(lo))-1;d<=Math.ceil(Math.log10(hi));d++)for(const mu of mults){const q=mu*Math.pow(10,d);if(q>=lo*0.999&&q<=hi*1.001)t.push(q)}
-  if(t.length<2){for(const mu of [1,1.5,2,3,4,5,6,8]){for(let d=Math.floor(Math.log10(lo))-1;d<=Math.ceil(Math.log10(hi));d++){const q=mu*Math.pow(10,d);if(q>=lo&&q<=hi&&!t.includes(q))t.push(q)}}t.sort((a,b)=>a-b)}
+  const dec=Math.log10(hi/lo),mults=dec>2.2?[1]:dec>0.9?[1,2,5]:[1,2,3,4,5,6,8];
+  let t=[];
+  const gen=ms=>{const o=[];for(let d=Math.floor(Math.log10(lo))-1;d<=Math.ceil(Math.log10(hi));d++)for(const m of ms){const q=m*Math.pow(10,d);if(q>=lo*0.999&&q<=hi*1.001)o.push(q)}return o};
+  t=gen(mults);if(t.length<2)t=gen([1,1.5,2,2.5,3,4,5,6,8]);
   return t;
 }
-const W=el=>Math.max(120,Math.floor(el.clientWidth||320));
-function gAttr(i){return ' data-g="'+i+'"'}
-
-/* ---------- panel 1: data ---------- */
-function drawData(){
-  const el=$('chA'),w=W(el),h=310,mg={l:46,r:8,t:8,b:44};
-  const pw=w-mg.l-mg.r,ph=h-mg.t-mg.b,k=A.k,logy=$('logy').checked,sh=A.shift;
-  const val=q=>logy?q+sh:q;
-  const allv=G.flatMap(g=>g.y.map(val));
-  let lo,hi=Math.max(...allv);
-  if(logy){lo=Math.min(...allv)}else lo=Math.min(0,Math.min(...allv));
-  const Y=logy?(q=>mg.t+ph*(1-(Math.log(Math.max(q,lo))-Math.log(lo))/(Math.log(hi*1.1)-Math.log(lo)))):(q=>mg.t+ph*(1-(q-lo)/((hi-lo)*1.05)));
-  const X=i=>mg.l+(i+0.5)/k*pw,cw=pw/k;
-  let s='<svg width="'+w+'" height="'+h+'" role="img" aria-label="Replicates in each group with mean and one standard deviation bars">';
-  const ticks=logy?logTicks(lo,hi*1.1):niceTicks(lo,hi*1.05,5);
-  ticks.forEach(t=>{s+='<line class="gl" x1="'+mg.l+'" x2="'+(w-mg.r)+'" y1="'+Y(t)+'" y2="'+Y(t)+'"/><text x="'+(mg.l-6)+'" y="'+(Y(t)+4)+'" text-anchor="end">'+f3(t)+'</text>'});
-  s+='<line class="ax" x1="'+mg.l+'" x2="'+(w-mg.r)+'" y1="'+(mg.t+ph)+'" y2="'+(mg.t+ph)+'"/>';
-  G.forEach((g,i)=>{
-    s+='<rect class="col"'+gAttr(i)+' x="'+(mg.l+i*cw)+'" y="'+mg.t+'" width="'+cw+'" height="'+ph+'" fill="transparent"/>';
-    g.y.forEach((q,r)=>{s+='<circle'+gAttr(i)+' cx="'+(X(i)+g.j[r]*cw*0.7)+'" cy="'+Y(val(q))+'" r="2.6" style="fill:var(--c-data);fill-opacity:.55"/>'});
-    const mu=A.mus[i],sd=A.sds[i],bw=cw*0.36;
-    const top=Y(val(mu+sd)),bot=Y(val(Math.max(mu-sd,logy?lo:-1e9)));
-    s+='<g style="stroke:var(--ink);stroke-width:1.5;pointer-events:none"><line x1="'+X(i)+'" x2="'+X(i)+'" y1="'+top+'" y2="'+bot+'"/><line x1="'+(X(i)-bw/2)+'" x2="'+(X(i)+bw/2)+'" y1="'+Y(val(mu))+'" y2="'+Y(val(mu))+'" style="stroke-width:2.5"/></g>';
-    const every=Math.ceil(k/Math.max(2,Math.floor(pw/48)));
-    if(i%every===0)s+='<text x="'+X(i)+'" y="'+(h-mg.b+14)+'" text-anchor="middle">'+f3(mu)+'</text>';
-  });
-  s+='<text x="'+(mg.l+pw/2)+'" y="'+(h-6)+'" text-anchor="middle">group mean (groups in order of mean)</text>';
-  s+='<text transform="translate(12,'+(mg.t+ph/2)+') rotate(-90)" text-anchor="middle">y'+(sh&&logy?' (shifted)':'')+'</text></svg>';
+const W=el=>Math.max(150,Math.floor(el.clientWidth||320));
+let uid=0;
+function chart(el,h,o){
+  const mg=Object.assign({l:50,r:12,t:10,b:42},o.mg||{}),w=W(el),pw=w-mg.l-mg.r,ph=h-mg.t-mg.b,id='cl'+(uid++);
+  const[x0,x1,xlg]=o.x,[y0,y1,ylg]=o.y;
+  const sc=(v,a,b,lg)=>lg?(Math.log(v)-Math.log(a))/(Math.log(b)-Math.log(a)):(v-a)/(b-a);
+  const X=v=>mg.l+sc(v,x0,x1,xlg)*pw,Y=v=>mg.t+(1-sc(v,y0,y1,ylg))*ph;
+  let s='<svg width="'+w+'" height="'+h+'" role="img" aria-label="'+(o.label||'chart')+'"><defs><clipPath id="'+id+'"><rect x="'+(mg.l-1)+'" y="'+(mg.t-1)+'" width="'+(pw+2)+'" height="'+(ph+2)+'"/></clipPath></defs>';
+  const xt=o.xt||(xlg?logTicks(x0,x1):niceTicks(x0,x1,Math.max(3,Math.floor(pw/75)))),yt=o.yt||(ylg?logTicks(y0,y1):niceTicks(y0,y1,Math.max(3,Math.floor(ph/48))));
+  xt.forEach(t=>{s+='<line class="gl" x1="'+X(t)+'" x2="'+X(t)+'" y1="'+mg.t+'" y2="'+(mg.t+ph)+'"/><text x="'+X(t)+'" y="'+(mg.t+ph+14)+'" text-anchor="middle">'+(o.fx?o.fx(t):f3(t))+'</text>'});
+  yt.forEach(t=>{s+='<line class="gl" x1="'+mg.l+'" x2="'+(mg.l+pw)+'" y1="'+Y(t)+'" y2="'+Y(t)+'"/><text x="'+(mg.l-6)+'" y="'+(Y(t)+4)+'" text-anchor="end">'+(o.fy?o.fy(t):f3(t))+'</text>'});
+  s+='<line class="ax" x1="'+mg.l+'" x2="'+(mg.l+pw)+'" y1="'+(mg.t+ph)+'" y2="'+(mg.t+ph)+'"/>';
+  s+='<g clip-path="url(#'+id+')">'+o.marks(X,Y,{mg,pw,ph,w,h})+'</g>';
+  if(o.after)s+=o.after(X,Y,{mg,pw,ph,w,h});
+  s+='<text x="'+(mg.l+pw/2)+'" y="'+(h-5)+'" text-anchor="middle">'+o.xl+'</text><text transform="translate(12,'+(mg.t+ph/2)+') rotate(-90)" text-anchor="middle">'+o.yl+'</text></svg>';
   el.innerHTML=s;
 }
+const dots=(xs,ys,X,Y,r,st)=>xs.map((q,i)=>'<circle cx="'+X(q)+'" cy="'+Y(ys[i])+'" r="'+r+'" style="'+st+'"/>').join('');
+const DOT='fill:var(--c-data);fill-opacity:.55';
 
-/* ---------- panel 2: spread-level ---------- */
+/* step 1 */
+function drawScatter(){
+  const x=D.x,y=D.y,xm=Math.min(...x),xM=Math.max(...x),ym=Math.min(...y),yM=Math.max(...y);
+  const y0=ym>=0?0:ym-0.05*(yM-ym),y1=yM+0.05*(yM-y0);
+  chart($('c1'),320,{x:[xm-0.03*(xM-xm),xM+0.03*(xM-xm),false],y:[y0,y1,false],xl:'x',yl:'y',label:'Scatter plot of y against x with fitted average',
+    marks:(X,Y)=>dots(x,y,X,Y,3,DOT)+'<path d="'+x.map((q,i)=>(i?'L':'M')+X(q)+' '+Y(S.f0.fitted[i])).join('')+'" fill="none" style="stroke:var(--ink);stroke-width:2.2"/>'});
+}
+/* residual plot (steps 2, 3, 6) */
+function drawResid(el,fitted,res,bins,xl,showBins){
+  const fm=Math.min(...fitted),fM=Math.max(...fitted),r=Math.max(...res.map(Math.abs))*1.12||1,pad=0.03*(fM-fm||1);
+  chart(el,300,{x:[fm-pad,fM+pad,false],y:[-r,r,false],xl:xl,yl:'leftover (data − line)',label:'Residuals against fitted values',
+    marks:(X,Y)=>{
+      let s='<line x1="'+X(fm-pad)+'" x2="'+X(fM+pad)+'" y1="'+Y(0)+'" y2="'+Y(0)+'" style="stroke:var(--muted);stroke-width:1.2"/>';
+      s+=dots(fitted,res,X,Y,3,DOT);
+      if(showBins)bins.forEach((b,i)=>{
+        const xa=X(b.lo),xb=X(b.hi);
+        s+='<rect x="'+xa+'" y="'+Y(b.rms)+'" width="'+Math.max(2,xb-xa)+'" height="'+(Y(-b.rms)-Y(b.rms))+'" style="fill:var(--ink);fill-opacity:.07;stroke:var(--ink);stroke-opacity:.7;stroke-width:1.2"/>';
+        if(i<bins.length-1){const m=X((b.hi+bins[i+1].lo)/2);s+='<line x1="'+m+'" x2="'+m+'" y1="'+Y(r)+'" y2="'+Y(-r)+'" style="stroke:var(--muted);stroke-dasharray:3 4"/>'}
+      });
+      return s;
+    }});
+}
+/* step 4 */
 function drawSL(){
-  const el=$('chB'),w=W(el),h=330,mg={l:50,r:12,t:10,b:44};
-  const pw=w-mg.l-mg.r,ph=h-mg.t-mg.b;
-  let x0=Math.min(...A.x),x1=Math.max(...A.x);const padx=Math.max((x1-x0)*0.06,0.08);x0-=padx;x1+=padx;
-  const vals=A.v.slice();let v0=Math.min(...vals)-0.35,v1=Math.max(...vals)+0.35;
-  const X=q=>mg.l+(q-x0)/(x1-x0)*pw,Y=q=>mg.t+ph*(1-(q-v0)/(v1-v0));
-  let s='<svg width="'+w+'" height="'+h+'" role="img" aria-label="Log SD against log mean for each group with fitted line and candidate laws"><defs><clipPath id="clB"><rect x="'+mg.l+'" y="'+mg.t+'" width="'+pw+'" height="'+ph+'"/></clipPath></defs>';
-  logTicks(Math.exp(x0),Math.exp(x1)).forEach(t=>{const q=Math.log(t);s+='<line class="gl" x1="'+X(q)+'" x2="'+X(q)+'" y1="'+mg.t+'" y2="'+(mg.t+ph)+'"/><text x="'+X(q)+'" y="'+(mg.t+ph+14)+'" text-anchor="middle">'+f3(t)+'</text>'});
-  logTicks(Math.exp(v0),Math.exp(v1)).forEach(t=>{const q=Math.log(t);s+='<line class="gl" x1="'+mg.l+'" x2="'+(w-mg.r)+'" y1="'+Y(q)+'" y2="'+Y(q)+'"/><text x="'+(mg.l-6)+'" y="'+(Y(q)+4)+'" text-anchor="end">'+f3(t)+'</text>'});
-  s+='<line class="ax" x1="'+mg.l+'" x2="'+(w-mg.r)+'" y1="'+(mg.t+ph)+'" y2="'+(mg.t+ph)+'"/>';
-  s+='<g clip-path="url(#clB)">';
-  /* CI band for fitted slope, anchored at the centroid */
-  const f=A.fit,L=q=>f.mv+f.b*(q-f.mx);
-  s+='<polygon points="'+X(x0)+','+Y(f.mv+f.lo*(x0-f.mx))+' '+X(x1)+','+Y(f.mv+f.lo*(x1-f.mx))+' '+X(x1)+','+Y(f.mv+f.hi*(x1-f.mx))+' '+X(x0)+','+Y(f.mv+f.hi*(x0-f.mx))+'" style="fill:var(--c-data);fill-opacity:.14"/>';
-  A.cands.forEach(c=>{
-    if(!c.ok)return;
-    const emph=c.id===A.best.id;
-    let d='';
-    if(c.id==='arc'){for(let i=0;i<=60;i++){const q=x0+(x1-x0)*i/60,u=Math.exp(q);if(u<=0||u>=1)continue;d+=(d?'L':'M')+X(q)+' '+Y(0.5*Math.log(u*(1-u))+c.cc)}}
-    else d='M'+X(x0)+' '+Y(c.lnh(x0)+c.cc)+'L'+X(x1)+' '+Y(c.lnh(x1)+c.cc);
-    s+='<path d="'+d+'" fill="none" style="stroke:var('+c.color+');stroke-width:'+(emph?2.5:1.6)+';stroke-dasharray:'+(emph?'none':'6 4')+';stroke-opacity:'+(emph?1:.85)+'"/>';
-  });
-  s+='<line x1="'+X(x0)+'" x2="'+X(x1)+'" y1="'+Y(L(x0))+'" y2="'+Y(L(x1))+'" style="stroke:var(--ink);stroke-width:1.2;stroke-opacity:.55"/>';
-  s+='</g>';
-  A.x.forEach((q,i)=>{s+='<circle'+gAttr(i)+' cx="'+X(q)+'" cy="'+Y(A.v[i])+'" r="5" style="fill:var(--c-data);stroke:var(--panel);stroke-width:2"/>'});
-  s+='<text x="'+(mg.l+pw/2)+'" y="'+(h-6)+'" text-anchor="middle">group mean (log scale)</text>';
-  s+='<text transform="translate(12,'+(mg.t+ph/2)+') rotate(-90)" text-anchor="middle">group SD (log scale)</text>';
-  s+='<text x="'+(w-mg.r-4)+'" y="'+(mg.t+14)+'" text-anchor="end" class="strong">fitted slope b = '+num(f.b)+' (95% CI '+num(f.lo)+' to '+num(f.hi)+')</text></svg>';
-  el.innerHTML=s;
+  const el=$('c4');
+  if(!S.valid){el.innerHTML='<p class="msg" style="color:var(--muted)">Not drawn: some fitted values are zero or negative, so a log scale cannot show them. Use the Box–Cox result in step 5.</p>';return}
+  const sl=S.sl,mus=S.bins.map(b=>b.mu),rs=S.bins.map(b=>b.rms);
+  const x0=Math.min(...mus)/1.25,x1=Math.max(...mus)*1.25,y0=Math.min(...rs)/1.8,y1=Math.max(...rs)*1.8;
+  const lx=Math.log;
+  chart(el,330,{x:[x0,x1,true],y:[y0,y1,true],xl:'average level in the bin (log scale)',yl:'spread in the bin (log scale)',label:'Log spread against log level for each bin',
+    marks:(X,Y)=>{
+      const f=sl.mv,L=q=>Math.exp(sl.mv+sl.b*(q-sl.mx));
+      let s='<polygon points="'+X(x0)+','+Y(Math.exp(sl.mv+sl.lo*(lx(x0)-sl.mx)))+' '+X(x1)+','+Y(Math.exp(sl.mv+sl.lo*(lx(x1)-sl.mx)))+' '+X(x1)+','+Y(Math.exp(sl.mv+sl.hi*(lx(x1)-sl.mx)))+' '+X(x0)+','+Y(Math.exp(sl.mv+sl.hi*(lx(x0)-sl.mx)))+'" style="fill:var(--c-data);fill-opacity:.14"/>';
+      sl.cands.forEach(c=>{
+        if(!c.ok)return;const em=c.id===sl.best.id;let d='';
+        if(c.id==='arc'){for(let i=0;i<=60;i++){const q=lx(x0)+(lx(x1)-lx(x0))*i/60,u=Math.exp(q);if(u>=1)continue;d+=(d?'L':'M')+X(u)+' '+Y(Math.exp(0.5*Math.log(u*(1-u))+c.cc))}}
+        else d='M'+X(x0)+' '+Y(Math.exp(c.lnh(lx(x0))+c.cc))+'L'+X(x1)+' '+Y(Math.exp(c.lnh(lx(x1))+c.cc));
+        s+='<path d="'+d+'" fill="none" style="stroke:var('+COL[c.id]+');stroke-width:'+(em?3:1.6)+';stroke-dasharray:'+(em?'none':'6 4')+';stroke-opacity:'+(em?1:.85)+'"/>';
+      });
+      s+='<line x1="'+X(x0)+'" x2="'+X(x1)+'" y1="'+Y(L(lx(x0)))+'" y2="'+Y(L(lx(x1)))+'" style="stroke:var(--ink);stroke-width:1.2;stroke-opacity:.55"/>';
+      s+=dots(mus,rs,X,Y,5.5,'fill:var(--c-data);stroke:var(--panel);stroke-width:2');
+      return s;
+    },
+    after:(X,Y,f)=>'<text x="'+(f.w-f.mg.r-4)+'" y="'+(f.mg.t+14)+'" text-anchor="end" class="strong">slope b = '+num(sl.b)+' (95% range '+num(sl.lo)+' to '+num(sl.hi)+')</text>'});
 }
-
-/* ---------- panel 3: support bars ---------- */
-function drawBars(){
-  $('bars').innerHTML=A.cands.map(c=>{
-    if(!c.ok)return '<div class="bar na"><div class="lab"><b>'+c.name+'</b><small>needs all means in (0, 1)</small></div><div class="track"></div><div class="pct">n/a</div></div>';
-    const pct=c.share*100;
-    return '<div class="bar'+(c.id===A.best.id?' best':'')+'"><div class="lab"><b>'+c.name+'</b><small>'+c.sub+'</small></div><div class="track"><div class="fill" style="width:'+pct+'%;background:var('+c.color+')"></div></div><div class="pct">'+(pct<0.1?'<0.1':pct.toFixed(pct<10?1:0))+'%</div></div>';
-  }).join('')+'<p class="note">Misfit of the best law: '+num(A.best.rms)+' in log SD (pure sampling noise from '+A.m+' replicates is about '+num(A.sTh)+').</p>';
-}
-
-/* ---------- panel 4: Box-Cox ---------- */
+/* step 5 */
 function drawBC(){
-  const el=$('chD'),w=W(el),h=330,mg={l:50,r:12,t:22,b:44};
-  const pw=w-mg.l-mg.r,ph=h-mg.t-mg.b,b=A.bc;
-  const mnll=Math.min(...b.ll);
-  const ylo=-6;
-  const X=q=>mg.l+(q+3)/6*pw,Y=q=>mg.t+ph*(q/ylo);
-  let s='<svg width="'+w+'" height="'+h+'" role="img" aria-label="Box-Cox profile log-likelihood against lambda with 95 percent interval"><defs><clipPath id="clD"><rect x="'+mg.l+'" y="'+mg.t+'" width="'+pw+'" height="'+ph+'"/></clipPath></defs>';
-  niceTicks(ylo,0,5).forEach(t=>{s+='<line class="gl" x1="'+mg.l+'" x2="'+(w-mg.r)+'" y1="'+Y(t)+'" y2="'+Y(t)+'"/><text x="'+(mg.l-6)+'" y="'+(Y(t)+4)+'" text-anchor="end">'+num(t)+'</text>'});
-  [-3,-2,-1,0,1,2,3].forEach(t=>{s+='<text x="'+X(t)+'" y="'+(mg.t+ph+14)+'" text-anchor="middle">'+num(t)+'</text>'});
-  s+='<line class="ax" x1="'+mg.l+'" x2="'+(w-mg.r)+'" y1="'+(mg.t+ph)+'" y2="'+(mg.t+ph)+'"/>';
-  s+='<g clip-path="url(#clD)">';
-  s+='<rect x="'+X(b.lo)+'" y="'+mg.t+'" width="'+Math.max(2,X(b.hi)-X(b.lo))+'" height="'+ph+'" style="fill:var(--c-data);fill-opacity:.12"/>';
-  [[1,'--c-id','1'],[0.5,'--c-sqrt','½'],[0,'--c-log','0'],[-1,'--c-recip','−1']].forEach(([q,c,lab])=>{
-    s+='<line x1="'+X(q)+'" x2="'+X(q)+'" y1="'+mg.t+'" y2="'+(mg.t+ph)+'" style="stroke:var('+c+');stroke-width:1.6;stroke-dasharray:5 4"/>';
-  });
-  s+='<line x1="'+mg.l+'" x2="'+(w-mg.r)+'" y1="'+Y(-1.92)+'" y2="'+Y(-1.92)+'" style="stroke:var(--muted);stroke-dasharray:3 3"/>';
-  s+='<path d="'+b.lams.map((q,i)=>(i?'L':'M')+X(q)+' '+Y(Math.max(b.ll[i],ylo*1.2))).join('')+'" fill="none" style="stroke:var(--c-data);stroke-width:2.5"/>';
-  s+='<line x1="'+X(b.lhat)+'" x2="'+X(b.lhat)+'" y1="'+mg.t+'" y2="'+Y(0)+'" style="stroke:var(--c-data);stroke-width:1"/>';
-  /* spread-level answer */
-  const lsl=1-A.fit.b,ly=mg.t+ph-12,xa=X(Math.max(-3,Math.min(3,1-A.fit.hi))),xb=X(Math.max(-3,Math.min(3,1-A.fit.lo)));
-  s+='<line x1="'+xa+'" x2="'+xb+'" y1="'+ly+'" y2="'+ly+'" style="stroke:var(--ink);stroke-width:2"/>';
-  const dx=X(Math.max(-3,Math.min(3,lsl)));
-  s+='<path d="M'+dx+' '+(ly-6)+'L'+(dx+6)+' '+ly+'L'+dx+' '+(ly+6)+'L'+(dx-6)+' '+ly+'Z" style="fill:var(--ink);stroke:var(--panel);stroke-width:1.5"/>';
-  s+='</g>';
-  [[1,'1'],[0.5,'½'],[0,'0'],[-1,'−1']].forEach(([q,lab])=>{s+='<text x="'+X(q)+'" y="'+(mg.t-7)+'" text-anchor="middle" class="strong">'+lab+'</text>'});
-  s+='<text x="'+(mg.l+pw/2)+'" y="'+(h-6)+'" text-anchor="middle">λ  (1 = none, ½ = √y, 0 = log y, −1 = 1/y)</text>';
-  s+='<text transform="translate(12,'+(mg.t+ph/2)+') rotate(-90)" text-anchor="middle">log-likelihood − maximum</text>';
-  s+='<text x="'+(w-mg.r-4)+'" y="'+(Y(-1.92)-5)+'" text-anchor="end">95% cutoff (−1.92)</text></svg>';
-  el.innerHTML=s;
+  const b=S.bc,ylo=-6;
+  chart($('c5'),330,{x:[-3,3,false],y:[ylo,0,false],xt:[-3,-2,-1,0,1,2,3],xl:'λ  (1 = none, ½ = √y, 0 = log y, −1 = 1/y)',yl:'score − best score',mg:{t:22},fx:v=>num(v,0),fy:v=>num(v,0),label:'Box-Cox profile log-likelihood against lambda',
+    marks:(X,Y,f)=>{
+      let s='<rect x="'+X(b.lo)+'" y="'+f.mg.t+'" width="'+Math.max(2,X(b.hi)-X(b.lo))+'" height="'+f.ph+'" style="fill:var(--c-data);fill-opacity:.12"/>';
+      [[1,'--c-id'],[0.5,'--c-sqrt'],[0,'--c-log'],[-1,'--c-recip']].forEach(([q,c])=>{s+='<line x1="'+X(q)+'" x2="'+X(q)+'" y1="'+f.mg.t+'" y2="'+(f.mg.t+f.ph)+'" style="stroke:var('+c+');stroke-width:1.6;stroke-dasharray:5 4"/>'});
+      s+='<line x1="'+f.mg.l+'" x2="'+(f.mg.l+f.pw)+'" y1="'+Y(-1.92)+'" y2="'+Y(-1.92)+'" style="stroke:var(--muted);stroke-dasharray:3 3"/>';
+      s+='<path d="'+b.lams.map((q,i)=>(i?'L':'M')+X(q)+' '+Y(Math.max(b.ll[i],ylo*1.2))).join('')+'" fill="none" style="stroke:var(--c-data);stroke-width:2.6"/>';
+      s+='<line x1="'+X(b.lhat)+'" x2="'+X(b.lhat)+'" y1="'+f.mg.t+'" y2="'+Y(0)+'" style="stroke:var(--c-data);stroke-width:1"/>';
+      if(S.sl){const cl=v=>Math.max(-3,Math.min(3,v)),ly=f.mg.t+f.ph-12,lsl=1-S.sl.b;
+        s+='<line x1="'+X(cl(1-S.sl.hi))+'" x2="'+X(cl(1-S.sl.lo))+'" y1="'+ly+'" y2="'+ly+'" style="stroke:var(--ink);stroke-width:2"/><path d="M'+X(cl(lsl))+' '+(ly-6)+'l6 6l-6 6l-6 -6z" style="fill:var(--ink);stroke:var(--panel);stroke-width:1.5"/>'}
+      s+='<text x="'+(f.mg.l+f.pw-4)+'" y="'+(Y(-1.92)-5)+'" text-anchor="end">95% cutoff (−1.92)</text>';
+      return s;
+    },
+    after:(X,Y,f)=>[[1,'1'],[0.5,'½'],[0,'0'],[-1,'−1']].map(([q,l])=>'<text x="'+X(q)+'" y="'+(f.mg.t-7)+'" text-anchor="middle" class="strong">'+l+'</text>').join('')});
+}
+/* step 6 */
+function drawCheck(){
+  drawResid($('c6a'),S.f0.fitted,S.f0.res,S.bins,'height of the line (original scale)',true);
+  drawResid($('c6b'),S.after.f1.fitted,S.after.f1.res,S.after.bins,'height of the line (transformed scale)',true);
+  $('cap6b').textContent='After: leftovers on the transformed scale ('+S.T.label+').';
+  const B=S.bins.length,b4=S.tr0.rel.map(Math.exp),a4=S.after.tr.rel.map(Math.exp);
+  const lo=Math.min(0.25,Math.min(...b4,...a4)*0.85),hi=Math.max(4,Math.max(...b4,...a4)*1.15),idx=Array.from({length:B},(_,i)=>i+1);
+  chart($('c6c'),280,{x:[0.5,B+0.5,false],y:[lo,hi,true],xt:idx.length>10?niceTicks(1,B,6):idx,xl:'bin (1 = lowest line height, '+B+' = highest)',yl:'spread ÷ typical spread',mg:{r:46},fx:v=>num(v,0),label:'Relative spread in each bin before and after the transformation',
+    marks:(X,Y)=>{
+      let s='<line x1="'+X(0.5)+'" x2="'+X(B+0.5)+'" y1="'+Y(1)+'" y2="'+Y(1)+'" style="stroke:var(--muted);stroke-width:1.2"/>';
+      s+='<path d="'+b4.map((q,i)=>(i?'L':'M')+X(i+1)+' '+Y(q)).join('')+'" fill="none" style="stroke:var(--c-id);stroke-width:2;stroke-dasharray:5 4"/>'+dots(idx,b4,X,Y,3.8,'fill:var(--c-id);stroke:var(--panel);stroke-width:1.5');
+      s+='<path d="'+a4.map((q,i)=>(i?'L':'M')+X(i+1)+' '+Y(q)).join('')+'" fill="none" style="stroke:var(--c-data);stroke-width:2.4"/>'+dots(idx,a4,X,Y,4.2,'fill:var(--c-data);stroke:var(--panel);stroke-width:1.5');
+      return s;
+    },
+    after:(X,Y,f)=>'<text x="'+(X(B+0.5)+4)+'" y="'+(Y(b4[B-1])+4)+'" class="strong" style="fill:var(--muted)">before</text><text x="'+(X(B+0.5)+4)+'" y="'+(Y(a4[B-1])+4)+'" class="strong">after</text>'});
 }
 
-/* ---------- tiles ---------- */
-function drawTiles(){
-  const box=$('tiles');
-  if(!box.children.length||box.children.length!==A.tiles.length){
-    box.innerHTML=A.tiles.map(t=>'<div class="tile" id="tile-'+t.id+'"><h3><span>'+TILELAB[t.id]+'</span><em hidden>flattest</em></h3><div class="chart"></div><p class="ratio"></p></div>').join('');
+/* ---------- readings ---------- */
+const inc=(bc)=>[[1,'none'],[0.5,'√y'],[0,'log y'],[-1,'1/y']].filter(([q])=>q>=bc.lo-1e-9&&q<=bc.hi+1e-9).map(([,n])=>n);
+function readings(){
+  const x=D.x,y=D.y,n=S.n,f=S.f0;
+  const ybar=mean(y),r2=1-f.rss/y.reduce((s,v)=>s+(v-ybar)*(v-ybar),0);
+  let eq;
+  if(S.deg===1){const sl=f.beta[1]/S.ols.xs,ic=f.beta[0]-f.beta[1]*S.ols.xm/S.ols.xs;eq='y ≈ '+f3(ic)+' '+(sl<0?'−':'+')+' '+f3(Math.abs(sl))+' · x'}else eq='a fitted curve';
+  $('r1').innerHTML='<p><b>'+n+' points.</b> x runs from '+f3(Math.min(...x))+' to '+f3(Math.max(...x))+' and y from '+f3(Math.min(...y))+' to '+f3(Math.max(...y))+'.</p><p>Fitted average: <b>'+eq+'</b> (it explains '+Math.round(r2*100)+'% of the up-and-down movement in y).</p><div class="look"><b>Look for:</b> is the cloud about as thick on the left as on the right, or does it fan out? Also check that the line follows the middle of the cloud. If it does not, fix the shape of the average (step 0) before anything else.</div>';
+  const t0=S.tr0;
+  $('r2').innerHTML='<p>Each dot is now measured from the line, so the line becomes the flat zero level.</p><div class="res"><b>Reading:</b> '+(t0.flat?'the band looks about the same thickness from low to high. The data may not need a transformation.':'the band changes thickness. Going from the lowest to the highest line-height, the spread changes by about <b>×'+fx(t0.factor)+'</b> (95% range ×'+fx(t0.flo)+' to ×'+fx(t0.fhi)+').')+'</div><div class="look"><b>Look for:</b> a fan shape. It means the noise depends on the level, which is exactly what a transformation can fix. A bow shape (leftovers mostly above zero in the middle, below at the ends) means the line is the wrong shape.</div>';
+  const rows=S.bins.map((b,i)=>'<tr><td class="n">'+(i+1)+'</td><td class="n">'+b.nb+'</td><td class="n">'+f3(b.lo)+' to '+f3(b.hi)+'</td><td class="n">'+f3(b.mu)+'</td><td class="n">'+f3(b.rms)+'</td><td class="n">'+(b.mu>0?(b.rms/b.mu).toFixed(2):'–')+'</td></tr>').join('');
+  $('r3').innerHTML='<div class="tbl"><table><thead><tr><th>Bin</th><th>Dots</th><th>Line height</th><th>Average</th><th>Spread</th><th>Spread ÷ avg</th></tr></thead><tbody>'+rows+'</tbody></table></div><div class="look"><b>Look for:</b> the Spread column rising as the Average column rises. If Spread ÷ avg stays about the same, the noise is a constant percent of the level (the log case).</div>';
+  /* step 4 */
+  if(!S.valid){$('r4').innerHTML='<p>Skipped. The bins have an average at or below zero, so we cannot take its log. Try a curve shape, add a bigger range of x, or lean on Box–Cox.</p>';}
+  else{
+    const sl=S.sl,pct=Math.round(sl.best.share*100);
+    const bars=sl.cands.map(c=>c.ok?'<div class="bar"><div class="lab"><b>'+c.name+'</b><small>'+c.sub+'</small></div><div class="track"><div class="fill" style="width:'+(c.share*100)+'%;background:var('+COL[c.id]+')"></div></div><div class="pct">'+(c.share<0.001?'<0.1':(c.share*100).toFixed(c.share<0.1?1:0))+'%</div></div>':'<div class="bar na"><div class="lab"><b>'+c.name+'</b><small>needs y and level between 0 and 1</small></div><div class="track"></div><div class="pct">n/a</div></div>').join('');
+    const head=sl.best.id==='arc'?'The bins follow the proportion pattern, spread ∝ √(μ(1−μ)). The free slope below is not meaningful for this pattern.':'<b>Slope b = '+num(sl.b)+'</b> (95% range '+num(sl.lo)+' to '+num(sl.hi)+'). The recipe is λ = 1 − b = <b>'+num(1-sl.b)+'</b>.';
+    $('r4').innerHTML='<p>'+head+'</p><p style="margin-top:4px"><b>Which rule fits best?</b> Relative support for each rule:</p><div class="bars">'+bars+'</div><div class="res"><b>Reading:</b> '+(pct<60?'no rule clearly wins. The levels may not differ enough, or there are too few dots per bin. See the checklist in step 0.':'<b>'+sl.best.name+'</b> has '+pct+'% of the support, which points to <b>'+TNAME[sl.best.id]+'</b>.')+'</div><div class="look"><b>Why λ = 1 − b?</b> If spread ∝ level<sup>b</sup>, the right re-scaling is the one whose slope is 1 ÷ level<sup>b</sup>. Integrating gives y<sup>1−b</sup>, or log y when b = 1.</div>';
   }
-  A.tiles.forEach(t=>{
-    const tile=$('tile-'+t.id),ch=tile.querySelector('.chart'),rt=tile.querySelector('.ratio');
-    tile.classList.toggle('flat',A.flat.id===t.id);
-    tile.querySelector('em').hidden=A.flat.id!==t.id;
-    if(!t.ok){ch.innerHTML='<div style="height:130px;display:flex;align-items:center;color:var(--muted);font-size:12.5px">Needs data between 0 and 1.</div>';rt.innerHTML='&nbsp;';return}
-    const w=W(ch),h=130,mg={l:26,r:4,t:6,b:6},pw=w-mg.l-mg.r,ph=h-mg.t-mg.b,k=A.k;
-    const lim=Math.log(16);
-    const X=i=>mg.l+(i+0.5)/k*pw,Y=q=>mg.t+ph*(0.5-Math.max(-lim,Math.min(lim,q))/(2*lim));
-    let s='<svg width="'+w+'" height="'+h+'" role="img" aria-label="Relative SD per group after '+TILELAB[t.id]+'">';
-    [1/8,1/2,2,8].forEach(q=>{s+='<line class="gl" x1="'+mg.l+'" x2="'+(w-mg.r)+'" y1="'+Y(Math.log(q))+'" y2="'+Y(Math.log(q))+'"/>'});
-    [[8,'8×'],[1,'1'],[1/8,'⅛']].forEach(([q,l])=>{s+='<text x="'+(mg.l-4)+'" y="'+(Y(Math.log(q))+4)+'" text-anchor="end">'+l+'</text>'});
-    s+='<line x1="'+mg.l+'" x2="'+(w-mg.r)+'" y1="'+Y(0)+'" y2="'+Y(0)+'" style="stroke:var(--muted);stroke-width:1.2"/>';
-    s+='<path d="'+t.rel.map((q,i)=>(i?'L':'M')+X(i)+' '+Y(q)).join('')+'" fill="none" style="stroke:var('+t.color+');stroke-width:1.6;stroke-opacity:.8"/>';
-    t.rel.forEach((q,i)=>{const off=Math.abs(q)>lim;s+='<circle'+gAttr(i)+' cx="'+X(i)+'" cy="'+Y(q)+'" r="3.6" style="fill:'+(off?'var(--panel)':'var('+t.color+')')+';stroke:var('+t.color+');stroke-width:'+(off?1.8:1.5)+'"/>'});
-    s+='</svg>';
-    ch.innerHTML=s;
-    rt.innerHTML='SD varies <b>×'+(t.ratio>=100?t.ratio.toFixed(0):t.ratio.toFixed(1))+'</b> across groups';
-  });
-  $('tilenote').textContent='Even a perfect transform leaves some wobble, because each SD comes from only '+A.m+' replicates: about ±'+Math.round(A.sTh*100)+'% each, so expect the SDs to span roughly ×'+Math.exp(A.sTh*1.5*Math.sqrt(2*Math.log(A.k))).toFixed(1)+' across '+A.k+' groups. Hollow dots are off the scale.';
+  /* step 5 */
+  const bc=S.bc,lo=(bc.loOpen?'≤ ':'')+num(bc.lo)+' to '+num(bc.hi)+(bc.hiOpen?' or more':''),ins=inc(bc);
+  let agree='';
+  if(S.sl&&S.sl.best.id!=='arc'){const a=1-S.sl.hi,b2=1-S.sl.lo,ov=!(b2<bc.lo||a>bc.hi);agree=ov?'The ranges from step 4 and step 5 <b>overlap</b>, so the two methods agree.':'The ranges from step 4 and step 5 <b>do not overlap</b>. Treat the answer with caution: the noise may depend on more than the level, or the data may be skewed.'}
+  $('r5').innerHTML='<p><b>Best λ = '+num(bc.lhat)+'.</b> The 95% range is <b>'+lo+'</b>. That range is the result of the test: every λ inside it is statistically as good as the best one.</p><div class="res"><b>Reading:</b> '+(ins.length?'easy settings inside the range: <b>'+ins.join(', ')+'</b>. '+(ins.length>1?'More than one is inside, which means the data cannot tell them apart; prefer the one closest to the best λ, or the simplest.':''):'none of the easy settings (1, ½, 0, −1) is inside the range, so the data want an in-between power such as y<sup>'+num(Math.round(bc.lhat*10)/10,1)+'</sup>.')+'</div><p>'+agree+'</p><div class="look"><b>Note:</b> a very wide range (like −2 to 1) means the data are not informative. A narrow one means the choice is firm.'+(S.shift?' All y were shifted up by '+f3(S.shift)+' here.':'')+' The test gives the right λ for the average model you chose in step 0.</div><div class="box" style="margin-top:10px"><b>What the Box–Cox test assumes</b><ul style="margin:6px 0 0;padding-left:20px;font-size:14px"><li><b>One re-scaling fixes everything.</b> For some single λ, the transformed y is a straight line (or the curve you chose) plus noise that is <em>bell-shaped with the same size everywhere</em>. It scores normality and equal spread together, not separately.</li><li><b>y is positive.</b> Powers and logs need y &gt; 0. Zeros or negatives are shifted up first, which changes the model.</li><li><b>The average has the right shape.</b> Box–Cox refits that same line or curve for every λ. A wrong shape can push λ around.</li><li><b>Points are independent</b> and come from the same process (no drift or batches).</li><li><b>Enough data.</b> The 95% range uses a large-sample approximation (χ² with 1 degree of freedom). With about 30 points or fewer it is rough, and outliers can shift λ a lot.</li><li><b>λ is treated as known afterwards.</b> It was estimated from the same data, so later intervals are slightly too narrow.</li></ul><p style="font-size:13px;color:var(--muted);margin:6px 0 0">Step 4 needs fewer assumptions (it only uses the bin spreads) but needs enough dots per bin and a wide range of levels. That is why we use both.</p></div>';
+  /* step 6 */
+  const a=S.after.tr,b0=S.tr0;
+  const verdict=a.flat?'<span class="pill ok">Flat enough</span>':'<span class="pill warn">Still trending</span>';
+  $('r6').innerHTML='<p><b>Transformation:</b> '+S.T.label+(S.T.id==='arc'&&!S.allProp?' <span class="pill bad">needs y between 0 and 1</span>':'')+(S.T.id===S.rec.id&&$('tr').value==='rec'?' (recommended from steps 4 and 5)':'')+'</p><p>Spread across the bins changes by <b>×'+fx(b0.factor)+'</b> before and <b>×'+fx(a.factor)+'</b> after (95% range ×'+fx(a.flo)+' to ×'+fx(a.fhi)+'). '+verdict+'</p><div class="res"><b>Reading:</b> '+(a.flat?'a range that includes ×1 means we see no remaining trend. Some bin-to-bin wobble is normal because each spread comes from only about '+Math.round(S.n/S.bins.length)+' dots.':'the range excludes ×1, so some trend remains. Try a nearby setting from the list, or use weights (step 7).')+'</div><div class="look"><b>Also check:</b> do the transformed leftovers look like a bell-shaped cloud, with no new bow or fan? A transformation that fixes the spread but bends the average is not a fix.</div>';
+  conclusion();
 }
 
-/* ---------- verdict ---------- */
-function verdict(){
-  const f=A.fit,b=A.bc,best=A.best,pct=Math.round(best.share*100);
-  const inc=[[1,'none'],[0.5,'√y'],[0,'log y'],[-1,'1/y']].filter(([q])=>q>=b.lo-1e-9&&q<=b.hi+1e-9).map(([,n])=>n);
-  const lamTxt=(b.loOpen?'≤ ':'')+num(b.lo)+' to '+num(b.hi)+(b.hiOpen?' or more':'');
-  let head;
-  if(pct<60)head='Inconclusive: several variance laws fit about equally well.';
-  else head='Use '+TNAME[best.id]+'.';
-  let l1;
-  if(best.id==='arc')l1='The group variances follow <b>μ(1−μ)/n</b>, the binomial pattern, so the power-law slope below is not meaningful.';
-  else l1='Spread–level slope <b>b = '+num(f.b)+'</b> (95% CI '+num(f.lo)+' to '+num(f.hi)+'), so SD ∝ μ<sup>b</sup> and the suggested power is <b>λ = 1 − b = '+num(1-f.b)+'</b>.';
-  const l2='Best-supported law: <b>'+best.name+'</b> ('+pct+'% of the support). '+(pct<60?'Widen the range of group means or add replicates to separate them.':'');
-  const l3='Box–Cox: <b>λ̂ = '+num(b.lhat)+'</b>, 95% CI '+lamTxt+'. '+(inc.length?'Inside the interval: <b>'+inc.join(', ')+'</b>.':'No standard transform lies inside the interval, so a fractional power or a different family may be needed.')+(b.shift?' (Values were shifted by '+f3(b.shift)+' so that all are positive.)':'');
-  const truth=FAMS[$('fam').value].truth;
-  $('verdict').innerHTML='<p class="big">'+head+'</p><p>'+l1+'</p><p>'+l2+'</p><p>'+l3+'</p><p>This dataset was generated to need <b>'+TNAME[truth]+'</b>. In real data you would not know that, which is why we infer it.</p>';
+/* ---------- conclusion ---------- */
+function conclusion(){
+  const R=S.T,id=R.id,bc=S.bc,a=S.after.tr,b=R.lam===null?null:1-R.lam;
+  const weak=(bc.hi-bc.lo>1.5)&&(!S.sl||S.sl.best.share<0.6);
+  const law={none:'the noise is about the same size everywhere',sqrt:'the noise grows like the square root of the level (variance proportional to the level), the pattern of counts',log:'the noise is a constant percent of the level (spread proportional to the level)',recip:'the noise grows very fast with the level (spread proportional to level squared)',arc:'the data are proportions, where noise is largest near 50% and shrinks toward 0% and 100%',pow:'the noise grows like level to the power '+(b===null?'?':num(b,1))}[id];
+  const how={
+    none:['Use ordinary least squares as is. Report ordinary confidence intervals.','There is nothing to stabilize, so the original scale is fine.'],
+    sqrt:['Fit √y against x with ordinary least squares, then square the results to go back.','Or keep y and use a <b>Poisson</b> (or quasi-Poisson) GLM, or weighted least squares with weights 1 ÷ fitted value.'],
+    log:['Fit log y against x with ordinary least squares. A slope then means “y is multiplied by e<sup>slope</sup> for each step in x”, a percent change.','Or keep y and use a <b>gamma</b> GLM with a log link, or weighted least squares with weights 1 ÷ (fitted value)².'],
+    recip:['Fit 1/y against x with ordinary least squares, then take 1/ of the results to go back.','Or keep y and use weighted least squares with weights 1 ÷ (fitted value)⁴.'],
+    arc:['Fit arcsin √p against x with ordinary least squares.','Better still, use <b>logistic regression</b> (a binomial GLM) on the original counts, which handles this noise pattern directly.'],
+    pow:['Fit y<sup>'+(R.lam===null?'λ':num(R.lam,1))+'</sup> against x with ordinary least squares, then take the matching root to go back.','Or keep y and use weighted least squares with weights 1 ÷ (fitted value)<sup>'+(b===null?'2b':num(2*b,1))+'</sup>.']
+  }[id];
+  const warns=S.reqs.filter(q=>q.st!=='ok').map(q=>'<li><span class="pill '+q.st+'">'+(q.st==='bad'?'fails':'warning')+'</span> '+q.t+'</li>').join('');
+  $('r7').innerHTML='<h3>'+(weak?'The evidence is weak. Treat this answer as a hint.':'Use '+TNAME[id]+'.')+'</h3>'
+   +'<p>Your scatter says <b>'+law+'</b>. '+(S.sl&&S.sl.best.id!=='arc'?'The spread–level slope was b = '+num(S.sl.b)+' and ':'')+'Box–Cox put λ at '+num(bc.lhat)+' (95% range '+num(bc.lo)+' to '+num(bc.hi)+').'+(R.lam!==null&&R.id!=='pow'&&(R.lam<bc.lo-1e-9||R.lam>bc.hi+1e-9)?' This setting lies in the step 4 range but just outside the Box–Cox range, so the two methods disagree slightly. Box–Cox also rewards bell-shaped residuals, which spread–level ignores.':'')+(id==='none'&&!S.tr0.flat?' The trend in spread was small enough that no transformation is not ruled out.':'')+'</p>'
+   +'<ul><li><b>What to do.</b> '+how[0]+'</li><li><b>Or, without transforming.</b> '+how[1]+'</li>'
+   +'<li><b>Did it work?</b> '+(a.flat?'After the transformation the bin spreads differ by ×'+fx(a.factor)+' (range ×'+fx(a.flo)+' to ×'+fx(a.fhi)+'), so no trend is left (step 6). Always look at the residual plot again after you fit your final model.':'A trend of ×'+fx(a.factor)+' remains (range ×'+fx(a.flo)+' to ×'+fx(a.fhi)+'). Try the neighbors of this λ in step 6, or use weighted least squares so you do not have to transform.')+'</li>'
+   +(id==='none'?'':'<li><b>Reporting.</b> Estimates and intervals are on the transformed scale. Converting back gives the <em>median</em> of y (for log, √ and 1/y), not the mean. If you need the mean, use the GLM route or correct for the transformation.</li>')
+   +'<li><b>Honest uncertainty.</b> λ was chosen from the same data, so intervals computed afterwards are a little too narrow, especially with a small N.</li></ul>'
+   +(warns?'<p><b>Your checklist (step 0) had issues:</b></p><ul>'+warns+'</ul><p>These can make the answer unreliable. A bigger sample, a wider range of x, or more points per bin usually fixes them.</p>':'<p><span class="pill ok">All checks passed</span> The sample size, bins, and range were adequate for this analysis.</p>');
 }
-
-/* ---------- hover linking ---------- */
-const tip=$('tip');
-function showTip(e,g){
-  const gr=G[g];
-  tip.innerHTML='<b>Group '+(g+1)+'</b><br>mean '+f3(A.mus[g])+'<br>SD '+f3(A.sds[g])+'<br>CV '+(A.sds[g]/A.mus[g]).toFixed(2);
-  tip.style.display='block';
-  const x=Math.min(e.clientX+14,window.innerWidth-tip.offsetWidth-8),y=Math.min(e.clientY+14,window.innerHeight-tip.offsetHeight-8);
-  tip.style.left=x+'px';tip.style.top=y+'px';
-}
-let hl=null;
-function setHl(g){
-  if(hl===g)return;
-  if(hl!==null)document.querySelectorAll('[data-g="'+hl+'"]').forEach(e=>e.classList.remove('hl'));
-  hl=g;
-  if(g!==null)document.querySelectorAll('[data-g="'+g+'"]').forEach(e=>e.classList.add('hl'));
-  else tip.style.display='none';
-}
-document.addEventListener('pointermove',e=>{
-  const t=e.target.closest&&e.target.closest('[data-g]');
-  if(t){const g=+t.getAttribute('data-g');setHl(g);showTip(e,g)}else setHl(null);
-});
 
 /* ---------- wiring ---------- */
-function renderCharts(){drawData();drawSL();drawBars();drawBC();drawTiles();hl=null}
-function update(){
-  $('ok').textContent=$('k').value;$('om').textContent=$('m').value;
-  const binomial=$('fam').value==='binom';
-  $('R').disabled=binomial;$('Rlab').style.opacity=binomial?.45:1;
-  $('oR').textContent=binomial?'0.05 to 0.95':'×'+(Math.pow(10,+$('R').value)).toFixed(1);
-  generate();analyze();verdict();renderCharts();
+function render(){
+  const q=a=>a;
+  readings();drawScatter();
+  drawResid($('c2'),S.f0.fitted,S.f0.res,S.bins,'height of the line at the dot',false);
+  drawResid($('c3'),S.f0.fitted,S.f0.res,S.bins,'height of the line at the dot',true);
+  drawSL();drawBC();drawCheck();
 }
-['fam','k','m','R','seed','logy'].forEach(id=>$(id).addEventListener(id==='logy'?'change':'input',id==='logy'?()=>{drawData()}:update));
-$('resample').addEventListener('click',()=>{$('seed').value=(+$('seed').value||1)+1;update()});
+function binOptions(){const s=$('bins');for(let i=3;i<=15;i++){const o=document.createElement('option');o.value=i;o.textContent=i;s.appendChild(o)}}
+function updateGenLabels(){
+  $('oN').textContent=$('N').value;$('oS').textContent=$('fam').value==='binom'?'(fixed)':'+'+$('slope').value+' per unit x';
+  $('slope').disabled=$('fam').value==='binom';$('slopelab').style.opacity=$('fam').value==='binom'?.45:1;
+}
+function fullRun(){
+  if(modeGen()){generate()}
+  updateGenLabels();
+  run();render();
+}
+function onPaste(){
+  const p=parsePaste();
+  if(p.err){$('pmsg').className='msg bad';$('pmsg').textContent=p.err;return}
+  D={x:p.x,y:p.y};$('pmsg').className='msg';$('pmsg').style.color='var(--muted)';$('pmsg').textContent='Using '+p.x.length+' points'+(p.bad?' ('+p.bad+' unreadable lines skipped)':'')+'.';
+  run();render();
+}
+function setMode(){const g=modeGen();$('genbox').hidden=!g;$('pastebox').hidden=g;if(g)fullRun();else onPaste()}
+binOptions();
+document.querySelectorAll('input[name=src]').forEach(e=>e.addEventListener('change',setMode));
+$('fam').addEventListener('change',()=>{$('deg').value=($('fam').value==='recip'||$('fam').value==='binom')?'2':'1'});
+['fam','N','slope','seed'].forEach(id=>$(id).addEventListener('input',()=>{if(modeGen())fullRun()}));
+$('resample').addEventListener('click',()=>{$('seed').value=(+$('seed').value||1)+1;fullRun()});
+$('usepaste').addEventListener('click',onPaste);
+['deg','bins'].forEach(id=>$(id).addEventListener('change',()=>{run();render()}));
+['tr','lam'].forEach(id=>$(id).addEventListener('input',()=>{pickTransform();readings();drawCheck()}));
 let rt=null,lastW=0;
-new ResizeObserver(()=>{const w=document.querySelector('.wrap').clientWidth;if(w===lastW)return;lastW=w;clearTimeout(rt);rt=setTimeout(()=>{if(A)renderCharts()},80)}).observe(document.querySelector('.wrap'));
-update();
+new ResizeObserver(()=>{const w=document.querySelector('.wrap').clientWidth;if(w===lastW)return;lastW=w;clearTimeout(rt);rt=setTimeout(()=>{if(S)render()},80)}).observe(document.querySelector('.wrap'));
+fullRun();
 })();
 </script>
 </body>
