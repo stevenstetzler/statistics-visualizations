@@ -565,7 +565,7 @@ function drawSL(){
   const sl=S.sl,mus=S.bins.map(b=>b.mu),rs=S.bins.map(b=>b.rms);
   const x0=Math.min(...mus)/1.25,x1=Math.max(...mus)*1.25,y0=Math.min(...rs)/1.8,y1=Math.max(...rs)*1.8;
   const lx=Math.log;
-  chart(el,330,{x:[x0,x1,true],y:[y0,y1,true],xl:'average level in the bin (log scale)',yl:'spread in the bin (log scale)',label:'Log spread against log level for each bin',
+  chart(el,340,{mg:{t:40},x:[x0,x1,true],y:[y0,y1,true],xl:'average level in the bin (log scale)',yl:'spread in the bin (log scale)',label:'Log spread against log level for each bin',
     marks:(X,Y)=>{
       const f=sl.mv,L=q=>Math.exp(sl.mv+sl.b*(q-sl.mx));
       let s='<polygon points="'+X(x0)+','+Y(Math.exp(sl.mv+sl.lo*(lx(x0)-sl.mx)))+' '+X(x1)+','+Y(Math.exp(sl.mv+sl.lo*(lx(x1)-sl.mx)))+' '+X(x1)+','+Y(Math.exp(sl.mv+sl.hi*(lx(x1)-sl.mx)))+' '+X(x0)+','+Y(Math.exp(sl.mv+sl.hi*(lx(x0)-sl.mx)))+'" style="fill:var(--c-data);fill-opacity:.14"/>';
@@ -579,7 +579,9 @@ function drawSL(){
       s+=dots(mus,rs,X,Y,5.5,'fill:var(--c-data);stroke:var(--panel);stroke-width:2');
       return s;
     },
-    after:(X,Y,f)=>'<text x="'+(f.w-f.mg.r-4)+'" y="'+(f.mg.t+14)+'" text-anchor="end" class="strong">slope b = '+num(sl.b)+' (95% range '+num(sl.lo)+' to '+num(sl.hi)+')</text>'});
+    after:(X,Y,f)=>{const x=f.mg.l;return '<rect x="'+x+'" y="3" width="16" height="10" style="fill:var(--c-data);fill-opacity:.14;stroke:var(--c-data);stroke-opacity:.5"/><text x="'+(x+22)+'" y="12">95% range for the slope</text>'
+      +'<line x1="'+(x+(f.w>420?170:150))+'" x2="'+(x+(f.w>420?186:166))+'" y1="8" y2="8" style="stroke:var(--ink);stroke-width:1.2;stroke-opacity:.55"/><text x="'+(x+(f.w>420?192:172))+'" y="12">fitted line</text>'
+      +'<text x="'+x+'" y="30" class="strong">slope b = '+num(sl.b)+' (95% range '+num(sl.lo)+' to '+num(sl.hi)+')</text>'}});
 }
 /* step 5 */
 function drawBC(){
