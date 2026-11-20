@@ -239,7 +239,7 @@ td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
       <span><i style="border-color:var(--c-arc)"></i>proportions → arcsin √p</span>
     </div>
     <div class="cols">
-      <div class="panel"><p class="cap">Blue dots are the bins. The shaded band is the 95% range for the fitted slope. The thick colored line is the best rule.</p><div class="chart" id="c4"></div></div>
+      <div class="panel"><p class="cap" id="cap4">Blue dots are the bins. The shaded band is the 95% range for the fitted slope. The thick colored line is the best rule.</p><div class="chart" id="c4"></div></div>
       <div class="read" id="r4"></div>
     </div>
   </div>
@@ -576,7 +576,21 @@ function drawResid(el,fitted,res,bins,xl,showBins){
 /* step 4 */
 function drawSL(){
   const el=$('c4');
-  if(!S.valid){el.innerHTML='<p class="msg" style="color:var(--muted)">Not drawn: some fitted values are zero or negative, so a log scale cannot show them. Use the Box–Cox result in step 5.</p>';return}
+  $('cap4').textContent=S.valid?'Blue dots are the bins. The shaded band is the 95% range for the fitted slope. The thick colored line is the best rule.':'Same bins on plain axes, because a log scale cannot show a level at or below zero. Hollow dots are bins whose level is at or below zero.';
+  if(!S.valid){
+    const mus=S.bins.map(b=>b.mu),rs=S.bins.map(b=>b.rms),lo=Math.min(...mus),hi=Math.max(...mus),pad=0.08*(hi-lo||1);
+    const x0=Math.min(lo-pad,-pad),x1=hi+pad,y1=Math.max(...rs)*1.18;
+    chart(el,340,{mg:{t:40},x:[x0,x1,false],y:[0,y1,false],xl:'average level in the bin (linear scale)',yl:'spread in the bin (linear scale)',label:'Spread against level on linear axes; some bins have a level at or below zero',
+      marks:(X,Y,f)=>{
+        let t='<rect x="'+X(x0)+'" y="'+f.mg.t+'" width="'+(X(0)-X(x0))+'" height="'+f.ph+'" style="fill:var(--bad);fill-opacity:.1"/>'
+          +'<line x1="'+X(0)+'" x2="'+X(0)+'" y1="'+f.mg.t+'" y2="'+(f.mg.t+f.ph)+'" style="stroke:var(--bad);stroke-width:1.6"/>';
+        S.bins.forEach(b=>{const neg=b.mu<=0;t+='<circle cx="'+X(b.mu)+'" cy="'+Y(b.rms)+'" r="5.5" style="fill:'+(neg?'var(--panel)':'var(--c-data)')+';stroke:'+(neg?'var(--bad)':'var(--panel)')+';stroke-width:'+(neg?2.5:2)+'"/>'});
+        return t;
+      },
+      after:(X,Y,f)=>'<rect x="'+f.mg.l+'" y="3" width="16" height="10" style="fill:var(--bad);fill-opacity:.1;stroke:var(--bad);stroke-opacity:.6"/><text x="'+(f.mg.l+22)+'" y="12">level at or below 0: a log cannot be taken</text>'
+        +'<text x="'+f.mg.l+'" y="30" class="strong">'+S.bins.filter(b=>b.mu<=0).length+' of '+S.bins.length+' bins have a level ≤ 0 (lowest: '+f3(lo)+')</text>'});
+    return;
+  }
   const sl=S.sl,mus=S.bins.map(b=>b.mu),rs=S.bins.map(b=>b.rms);
   const x0=Math.min(...mus)/1.25,x1=Math.max(...mus)*1.25,y0=Math.min(...rs)/1.8,y1=Math.max(...rs)*1.8;
   const lx=Math.log;
@@ -650,7 +664,7 @@ function readings(){
   const rows=S.bins.map((b,i)=>'<tr><td class="n">'+(i+1)+'</td><td class="n">'+b.nb+'</td><td class="n">'+f3(b.lo)+' to '+f3(b.hi)+'</td><td class="n">'+f3(b.mu)+'</td><td class="n">'+f3(b.rms)+'</td><td class="n">'+(b.mu>0?(b.rms/b.mu).toFixed(2):'–')+'</td></tr>').join('');
   $('r3').innerHTML='<div class="tbl"><table><thead><tr><th>Bin</th><th>Dots</th><th>Line height</th><th>Average</th><th>Spread</th><th>Spread ÷ avg</th></tr></thead><tbody>'+rows+'</tbody></table></div><div class="look"><b>Look for:</b> the Spread column rising as the Average column rises. If Spread ÷ avg stays about the same, the noise is a constant percent of the level (the log case).</div>';
   /* step 4 */
-  if(!S.valid){$('r4').innerHTML='<p>Skipped. The bins have an average at or below zero, so we cannot take its log. Try a curve shape, add a bigger range of x, or lean on Box–Cox.</p>';}
+  if(!S.valid){const nneg=S.bins.filter(b=>b.mu<=0).length;$('r4').innerHTML='<p><b>The log–log version is skipped.</b> In '+nneg+' of '+S.bins.length+' bins the <em>average fitted level</em> (the height of your line there) is zero or below, and the logarithm of zero or a negative number does not exist. The spread–level rule, SD = c·level<sup>b</sup>, needs a positive level.</p><p>The leftovers themselves are fine: they can be negative, because the spread uses their squares. It is the <em>level</em> that has to be positive.</p><p>The plot on the left shows the same bins on plain axes. The red zone is where the line dips to zero or below. The hollow dots are bins inside it.</p><div class="look"><b>What to try:</b> set the shape of the average to Curve, widen the range of x, or lean on the Box–Cox result in step 5. If y really includes zero or negative values, log, √ and 1/y are not defined for them either.</div>';}
   else{
     const sl=S.sl,pct=Math.round(sl.best.share*100);
     const bars=sl.cands.map(c=>c.ok?'<div class="bar"><div class="lab"><b>'+c.name+'</b><small>'+c.sub+'</small></div><div class="track"><div class="fill" style="width:'+(c.share*100)+'%;background:var('+COL[c.id]+')"></div></div><div class="pct">'+(c.share<0.001?'<0.1':(c.share*100).toFixed(c.share<0.1?1:0))+'%</div></div>':'<div class="bar na"><div class="lab"><b>'+c.name+'</b><small>needs y and level between 0 and 1</small></div><div class="track"></div><div class="pct">n/a</div></div>').join('');
