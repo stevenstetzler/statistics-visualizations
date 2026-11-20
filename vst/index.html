@@ -115,6 +115,14 @@ td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
 <h1>Which variance-stabilizing transformation does my data call for?</h1>
 <p class="lead">You do not have to guess between √y, log y and 1/y. If your data come in groups (dose levels, time bins, bins of fitted value), the way the spread grows with the level tells you. Pick a generating process below, then watch how one dataset points to its own transformation, and how the Box–Cox profile agrees.</p>
 
+<div class="try" style="margin:0 0 16px;border-style:solid"><b>In plain words</b>
+  <p style="margin:6px 0">Some data have a problem: the <em>bigger</em> the numbers, the <em>noisier</em> they are. Think of weighing things: a feather is off by a hair, a truck is off by a lot. Many statistics tools assume the noise is the same size everywhere, so we look for a re-scaling of the numbers that makes it so.</p>
+  <p style="margin:6px 0"><b>λ (lambda) is a dial</b> for that re-scaling. We raise every number to the power λ. λ = 1 leaves the data alone, λ = ½ takes square roots, λ = 0 means take the log, and λ = −1 means 1/y. Lower settings squash big numbers harder.</p>
+  <p style="margin:6px 0"><b>Why groups?</b> You can't see how spread out data are from one number. So we make piles of points that are about the same size (repeats of the same measurement, or points sorted by size and cut into piles) and measure the spread in each pile.</p>
+  <p style="margin:6px 0"><b>Two ways to find λ.</b> (2) The spread–level plot reads it from how quickly the noise grows. (4) The Box–Cox test tries every setting of the dial and scores each one. The plot of scores has a peak (the best λ, one number) and a dashed line: settings above the line are still believable. If 0, ½ or 1 is in that range, use it because it is easy to explain.</p>
+  <p style="margin:6px 0"><b>Did it work?</b> After re-scaling, we measure the spread in every pile again. A good re-scaling gives similar spread in every pile. The tile shows the biggest spread divided by the smallest ("×2.1" is good, "×12" is bad); the highlighted tile is the one whose spreads differ least.</p>
+</div>
+
 <div class="ctl" role="group" aria-label="Dataset controls">
   <label for="fam">Where the data come from
     <select id="fam">
