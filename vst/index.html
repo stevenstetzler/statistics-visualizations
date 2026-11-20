@@ -119,7 +119,7 @@ td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
 .two li{margin-bottom:8px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 .eq{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 11px;display:block;overflow-x:auto;margin:6px 0;max-width:none;white-space:pre-wrap}
-.math th{text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink)}.math h3{margin:14px 0 4px;font-size:15px}.math .katex-display{margin:8px 0;overflow-x:auto;overflow-y:hidden;padding:2px 0}.math .katex{font-size:1.08em}.math p,.math li{max-width:78ch}.math ul{margin:4px 0 8px;padding-left:20px}
+.math th{text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink)}.math p,#tune p{overflow-x:auto;overflow-y:hidden}#tune .katex-display{overflow-x:auto;overflow-y:hidden;margin:8px 0}.math h3{margin:14px 0 4px;font-size:15px}.math .katex-display{margin:8px 0;overflow-x:auto;overflow-y:hidden;padding:2px 0}.math .katex{font-size:1.08em}.math p,.math li{max-width:78ch}.math ul{margin:4px 0 8px;padding-left:20px}
 </style>
 </head>
 <body>
@@ -254,6 +254,34 @@ td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
     <div class="cols">
       <div class="panel"><p class="cap">Score against λ. Higher is better. The peak is the best λ. Settings above the dashed line cannot be ruled out at 95%. The black diamond is the answer from step 4.</p><div class="chart" id="c5"></div></div>
       <div class="read" id="r5"></div>
+    </div>
+    <div class="box" id="tune" style="margin-top:14px">
+      <b>Tune what the λ score cares about</b>
+      <p>Box–Cox's score is really the sum of three parts, and you can weigh each one yourself:</p>
+      <ul style="margin:4px 0 8px;padding-left:20px">
+        <li><b>Normality and overall fit</b> \(\ell_{\text{ref}}\): how well a Gaussian with a free average and a free spread in each bin of x fits y. This is also where the Jacobian term lives.</li>
+        <li><b>Linearity</b> \(L_{\text{lin}}\le0\): how much worse your line (or curve) fits than a very flexible curve. It is 0 when the line is as good.</li>
+        <li><b>Constant spread</b> \(L_{\text{var}}\le0\): how unequal the bin variances are. It is 0 when they are all equal.</li>
+      </ul>
+      $$J_w(\lambda)=w_{\text{norm}}\,\ell_{\text{ref}}(\lambda)+w_{\text{lin}}\,L_{\text{lin}}(\lambda)+w_{\text{var}}\,L_{\text{var}}(\lambda)$$
+      <p>With all three weights equal to 1 this is exactly the Box–Cox score (section 8.5 has the algebra). Setting a weight to 0 turns that goal off.</p>
+      <div class="ctl" style="margin:8px 0">
+        <label for="wn">Normality <span class="v" id="own"></span><input id="wn" type="range" min="0" max="3" step="0.1" value="1"></label>
+        <label for="wl">Linearity <span class="v" id="owl"></span><input id="wl" type="range" min="0" max="3" step="0.1" value="1"></label>
+        <label for="wv">Constant spread <span class="v" id="owv"></span><input id="wv" type="range" min="0" max="3" step="0.1" value="1"></label>
+        <button type="button" id="pbc">Box–Cox (1, 1, 1)</button>
+        <button type="button" id="pvar">Spread only (0, 0, 1)</button>
+        <button type="button" id="plin">Linearity only (0, 1, 0)</button>
+        <button type="button" id="pnorm">Normality only (1, 0, 0)</button>
+      </div>
+      <div class="ctl" style="margin:0 0 8px"><label for="lintype">How to measure linearity
+        <select id="lintype"><option value="lr" selected>Likelihood ratio (what Box–Cox uses)</option><option value="alt">Share of the signal that is curved</option></select></label></div>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 6px;max-width:80ch">The likelihood-ratio version compares the curve's misfit to the <em>noise</em>, so a λ that buries the signal in noise can hide curvature. The “share of the signal” version compares it to the signal, so it cannot be gamed that way, but it is not part of the exact Box–Cox identity.</p>
+      <div class="key" id="tkey"></div>
+      <div class="cols">
+        <div class="panel"><p class="cap">Each colored curve is one goal's weighted complaint at each λ (0 = that goal is happiest). The blue curve is the weighted total.</p><div class="chart" id="c5b"></div></div>
+        <div class="read" id="r5b"></div>
+      </div>
     </div>
   </div>
 </section>
@@ -482,7 +510,7 @@ function run(){
   }
   const lmax=Math.max(...ll),ih=ll.indexOf(lmax),cut=lmax-1.92,ins=ll.map(q=>q>=cut);
   let iLo=ih,iHi=ih;while(iLo>0&&ins[iLo-1])iLo--;while(iHi<ll.length-1&&ins[iHi+1])iHi++;
-  const bc={lams,ll:ll.map(q=>q-lmax),lhat:lams[ih],lo:lams[iLo],hi:lams[iHi],loOpen:iLo===0,hiOpen:iHi===ll.length-1};
+  const bc={lams,raw:ll,ll:ll.map(q=>q-lmax),lhat:lams[ih],lo:lams[iLo],hi:lams[iHi],loOpen:iLo===0,hiOpen:iHi===ll.length-1};
   /* recommendation */
   let rec;
   const allProp=y.every(v=>v>=0&&v<=1);
@@ -495,7 +523,7 @@ function run(){
     rec=std.length?mkT(std[0].id):mkT('pow',Math.round(mid*10)/10);
   }
   S={n,deg,ols,shift,yp,f0,bins,tr0,sl,bc,rec,valid,allProp,sumLog};
-  checks();pickTransform();
+  decompose();checks();pickTransform();
 }
 function pickTransform(){
   const v=$('tr').value;$('lamlab').hidden=v!=='pow';
@@ -724,6 +752,70 @@ function conclusion(){
 }
 
 
+
+/* ---------- three-part decomposition of the Box-Cox score ---------- */
+function decompose(){
+  const x=D.x,n=S.n,yp=S.yp,K=S.bins.length,lams=S.bc.lams;
+  const dflex=Math.min(Math.max(S.deg+2,3),n-3),useFlex=dflex>S.deg;
+  const flex=useFlex?makeOLS(x,dflex):null;
+  const base=Math.floor(n/K),extra=n%K,groups=[];let pos=0;
+  for(let k=0;k<K;k++){const sz=base+(k<extra?1:0);groups.push([pos,pos+sz]);pos+=sz}
+  const ref=[],lin=[],vr=[],linAlt=[];
+  lams.forEach(lam=>{
+    const z=yp.map(q=>lam===0?Math.log(q):(Math.pow(q,lam)-1)/lam);
+    const fl=S.ols.fit(z),rl=fl.rss;
+    let rf=rl,res=fl.res;
+    if(useFlex){const f=flex.fit(z);rf=f.rss;res=f.res}
+    let sumN=0;
+    groups.forEach(([a,b])=>{let ss=0;for(let i=a;i<b;i++)ss+=res[i]*res[i];sumN+=(b-a)*Math.log(Math.max(ss/(b-a),1e-300))});
+    lin.push(useFlex?-(n/2)*Math.log(rl/Math.max(rf,1e-300)):0);
+    {const zm=mean(z),tss=z.reduce((a,q)=>a+(q-zm)*(q-zm),0),sig=Math.max(tss-rf,1e-300),c=useFlex?Math.min(Math.max((rl-rf)/sig,0),0.999999):0;linAlt.push((n/2)*Math.log(1-c))}
+    vr.push(-0.5*(n*Math.log(Math.max(rf/n,1e-300))-sumN));
+    ref.push(-0.5*sumN+(lam-1)*S.sumLog);
+  });
+  const diff=Math.max(...lams.map((_,i)=>Math.abs(ref[i]+lin[i]+vr[i]-S.bc.raw[i])));
+  S.dec={lams,ref,lin,linAlt,vr,diff,useFlex,dflex,K};
+}
+const amax=a=>a.indexOf(Math.max(...a));
+function drawTune(){
+  const d=S.dec,wn=+$('wn').value,wl=+$('wl').value,wv=+$('wv').value,alt=$('lintype').value==='alt',LIN=alt?d.linAlt:d.lin;
+  $('own').textContent=wn.toFixed(1);$('owl').textContent=wl.toFixed(1);$('owv').textContent=wv.toFixed(1);
+  $('tkey').innerHTML='<span><i style="border-color:var(--c-arc)"></i>normality / overall fit</span><span><i style="border-color:var(--c-sqrt)"></i>linearity</span><span><i style="border-color:var(--c-log)"></i>constant spread</span><span><i style="border-color:var(--c-data);border-top-width:4px"></i>weighted total</span>';
+  const rel=a=>{const m=Math.max(...a);return a.map(q=>q-m)};
+  const cn=rel(d.ref).map(q=>wn*q),cl=rel(LIN).map(q=>wl*q),cv=rel(d.vr).map(q=>wv*q);
+  const J=d.lams.map((_,i)=>wn*d.ref[i]+wl*LIN[i]+wv*d.vr[i]),Jm=Math.max(...J),Jr=J.map(q=>q-Jm);
+  const ih=amax(J);let lo=ih,hi=ih;while(lo>0&&Jr[lo-1]>=-1.92)lo--;while(hi<J.length-1&&Jr[hi+1]>=-1.92)hi++;
+  const ylo=-10;
+  const path=(arr,st)=>'<path d="'+arr.map((q,i)=>(i?'L':'M')+X0(d.lams[i])+' '+Y0(Math.max(q,ylo*1.5))).join('')+'" fill="none" style="'+st+'"/>';
+  let X0,Y0;
+  chart($('c5b'),320,{x:[-3,3,false],y:[ylo,0,false],xt:[-3,-2,-1,0,1,2,3],xl:'λ',yl:'score − best (weighted)',fx:v=>num(v,0),fy:v=>num(v,0),label:'Three-part score against lambda',
+    marks:(X,Y,f)=>{
+      X0=X;Y0=Y;
+      let t='<rect x="'+X(d.lams[lo])+'" y="'+f.mg.t+'" width="'+Math.max(2,X(d.lams[hi])-X(d.lams[lo]))+'" height="'+f.ph+'" style="fill:var(--c-data);fill-opacity:.1"/>';
+      t+=path(cn,'stroke:var(--c-arc);stroke-width:1.8;stroke-opacity:'+(wn?.95:.15)+';stroke-dasharray:'+(wn?'none':'4 4'));
+      t+=path(cl,'stroke:var(--c-sqrt);stroke-width:1.8;stroke-opacity:'+(wl?.95:.15)+';stroke-dasharray:'+(wl?'none':'4 4'));
+      t+=path(cv,'stroke:var(--c-log);stroke-width:1.8;stroke-opacity:'+(wv?.95:.15)+';stroke-dasharray:'+(wv?'none':'4 4'));
+      t+=path(Jr,'stroke:var(--c-data);stroke-width:3.2');
+      t+='<line x1="'+X(d.lams[ih])+'" x2="'+X(d.lams[ih])+'" y1="'+f.mg.t+'" y2="'+Y(0)+'" style="stroke:var(--c-data);stroke-width:1"/>';
+      return t;
+    }});
+  const lamW=d.lams[ih],ownBest=a=>{const i=amax(a);return num(d.lams[i])+((i===0||i===d.lams.length-1)?' <em>(edge of range)</em>':'')};
+  const bcl=S.bc.lhat,wtot=wn+wl+wv;
+  $('r5b').innerHTML='<p><b>Weighted best λ = '+num(lamW)+'</b> (tolerance band '+num(d.lams[lo])+' to '+num(d.lams[hi])+').'+((wn===1&&wl===1&&wv===1)?' With all weights at 1 this is the 95% confidence range of the standard Box–Cox test.':' The band is every λ within 1.92 of the best score. It is only a true 95% confidence range when all three weights are 1.')+'</p>'
+   +'<div class="tbl"><table><thead><tr><th>Goal alone</th><th>Weight</th><th>Its own best λ</th></tr></thead><tbody>'
+   +'<tr><td>Normality / overall fit</td><td class="n">'+wn.toFixed(1)+'</td><td class="n">'+ownBest(d.ref)+'</td></tr>'
+   +'<tr><td>Linearity</td><td class="n">'+wl.toFixed(1)+'</td><td class="n">'+(d.useFlex?ownBest(LIN):'n/a (need more points)')+'</td></tr>'
+   +'<tr><td>Constant spread</td><td class="n">'+wv.toFixed(1)+'</td><td class="n">'+ownBest(d.vr)+'</td></tr></tbody></table></div>'
+   +(d.lams[amax(LIN)]<=-3||d.lams[amax(LIN)]>=3?'<p style="font-size:13px;color:var(--muted)">“Edge of range” means this goal alone keeps improving as λ becomes extreme. With the likelihood-ratio version that usually means the transformation is hiding the curvature in noise, so do not trust it. Try the “share of the signal” option.</p>':'')+'<p style="font-size:13px;color:var(--muted)">Self-check: the three parts (likelihood-ratio version of linearity) add up to the Box–Cox score, largest difference '+d.diff.toExponential(1)+'. Standard Box–Cox λ̂ = '+num(bcl)+'.'+(alt?' The “share of signal that is curved” option is not part of that exact identity.':'')+(wtot===0?' All weights are 0, so every λ ties.':'')+'</p>'
+   +'<button type="button" id="usew">Use λ = '+num(lamW)+' in step 6</button>'
+   +'<p style="font-size:13px;color:var(--muted);margin-top:8px">If the three “own best” values differ a lot, no single transformation can satisfy all the goals. That is when to model the mean with a curve and the spread with weights or a GLM instead.</p>';
+  $('usew').onclick=()=>{
+    const std=[[1,'none'],[0.5,'sqrt'],[0,'log'],[-1,'recip']].find(([q])=>Math.abs(q-lamW)<0.03);
+    if(std)$('tr').value=std[1];else{$('tr').value='pow';$('lam').value=lamW.toFixed(2)}
+    pickTransform();readings();drawCheck();
+    $('s6').scrollIntoView({behavior:'smooth',block:'start'});
+  };
+}
 /* ---------- section 8: the math ---------- */
 function polyCoefs(beta,xm,xs){
   if(beta.length===2)return[beta[0]-beta[1]*xm/xs,beta[1]/xs];
@@ -733,7 +825,7 @@ const tn=v=>num(v).replace('−','-');
 const tf=v=>f3(v).replace('−','-');
 function polyTex(c){return c.map((v,i)=>{const a=tf(Math.abs(v));const term=i===0?a:i===1?a+String.raw`\,x`:a+String.raw`\,x^2`;return (i===0?(v<0?'-':''):(v<0?'-':'+'))+term}).join('')}
 function renderMath(){
-  if(window.renderMathInElement)renderMathInElement($('r8'),{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false});
+  if(window.renderMathInElement)[$('r8'),$('tune')].forEach(el=>renderMathInElement(el,{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false}));
 }
 function math(){
   const n=S.n,deg=S.deg,T=S.T,bc=S.bc,f0=S.f0,f1=S.after.f1;
@@ -788,6 +880,13 @@ function math(){
    +'<tr><td><b>Steps 5–6</b><br>Box–Cox / '+T.label+'</td><td>'+(T.lam!==null?'median \\(=g^{-1}\\bigl('+polyTex(c1)+'\\bigr)\\)':'on the arcsin scale')+'</td><td>'+(T.lam!==null?'\\(\\hat\\sigma^2\\mu^{'+tn(2*(1-T.lam))+'},\\ \\hat\\sigma^2='+tf(sig2)+'\\)':'\\(\\approx 1/(4m)\\)')+'</td></tr>'
    +'</tbody></table></div>'
    +'<p style="font-size:13px;color:var(--muted)">The two rows are two different descriptions of the same data. They agree on the variance exponent when the mean function is also right on the transformed scale (see the notes in step 5). When they disagree, look at the mean function first.</p>';
+  const d=S.dec;
+  h+='<h3>8.5 The Box–Cox score as three parts</h3>'
+   +'<p>Let \\(\\mathrm{RSS}_{\\text{line}}\\) be the residual sum of squares of your chosen mean model on the transformed scale, and \\(\\mathrm{RSS}_{\\text{flex}}\\) that of a much more flexible polynomial (degree '+d.dflex+'). Split the data into \\(K='+d.K+'\\) bins of x, let \\(\\hat\\sigma_k^2\\) be the flexible model\'s residual variance in bin \\(k\\) (\\(n_k\\) points), and \\(\\hat\\sigma_p^2=\\mathrm{RSS}_{\\text{flex}}/n\\) the pooled variance. Then the Box–Cox score splits exactly:</p>'
+   +String.raw`$$\ell_{\mathrm{BC}}(\lambda)=\underbrace{-\tfrac12\sum_k n_k\ln\hat\sigma_k^2+(\lambda-1)\sum_i\ln y_i}_{\ell_{\mathrm{ref}}}\;+\;\underbrace{-\tfrac n2\ln\frac{\mathrm{RSS}_{\mathrm{line}}}{\mathrm{RSS}_{\mathrm{flex}}}}_{L_{\mathrm{lin}}\,\le\,0}\;+\;\underbrace{-\tfrac12\Bigl[n\ln\hat\sigma_p^2-\sum_k n_k\ln\hat\sigma_k^2\Bigr]}_{L_{\mathrm{var}}\,\le\,0}$$`
+   +'<p>The algebra: \\(-\\tfrac n2\\ln(\\mathrm{RSS}_{\\text{line}}/n)=-\\tfrac n2\\ln\\hat\\sigma_p^2-\\tfrac n2\\ln(\\mathrm{RSS}_{\\text{line}}/\\mathrm{RSS}_{\\text{flex}})\\), and \\(-\\tfrac n2\\ln\\hat\\sigma_p^2=L_{\\text{var}}-\\tfrac12\\sum_k n_k\\ln\\hat\\sigma_k^2\\). Add the Jacobian term \\((\\lambda-1)\\sum\\ln y_i\\) and the three parts appear. On your data the two sides agree to within '+d.diff.toExponential(1)+' at every \\(\\lambda\\) on the grid.</p>'
+   +'<ul><li>\\(L_{\\text{lin}}\\) is a log-likelihood ratio for “is the line as good as a flexible curve?” It is scale-free and 0 when the line is enough.</li><li>\\(L_{\\text{var}}\\) is Bartlett’s log-likelihood ratio for equal variances across bins. It is scale-free and 0 when all bins have the same variance.</li><li>\\(\\ell_{\\text{ref}}\\) is the Gaussian log-likelihood on the original \\(y\\) scale of the most flexible model (free mean, free variance per bin). It is what remains, and it is where the transformation’s effect on the <em>shape</em> of the errors (normality) is scored.</li></ul>'
+   +'<p>Weighting the three parts, \\(J_w=w_{\\text{norm}}\\ell_{\\text{ref}}+w_{\\text{lin}}L_{\\text{lin}}+w_{\\text{var}}L_{\\text{var}}\\), recovers Box–Cox at \\(w=(1,1,1)\\). The \\(\\chi^2_1\\) cutoff of 1.92 is a valid 95% range only at that setting.</p>';
   $('r8').innerHTML=h;renderMath();
 }
 /* ---------- wiring ---------- */
@@ -796,7 +895,7 @@ function render(){
   readings();drawScatter();
   drawResid($('c2'),S.f0.fitted,S.f0.res,S.bins,'fitted value (what the line predicts)',false);
   drawResid($('c3'),S.f0.fitted,S.f0.res,S.bins,'fitted value (what the line predicts)',true);
-  drawSL();drawBC();drawCheck();
+  drawSL();drawBC();drawTune();drawCheck();
 }
 function binOptions(){const s=$('bins');for(let i=3;i<=15;i++){const o=document.createElement('option');o.value=i;o.textContent=i;s.appendChild(o)}}
 function updateGenLabels(){
@@ -824,6 +923,9 @@ $('resample').addEventListener('click',()=>{$('seed').value=(+$('seed').value||1
 $('usepaste').addEventListener('click',onPaste);
 ['deg','bins'].forEach(id=>$(id).addEventListener('change',()=>{run();render()}));
 ['tr','lam'].forEach(id=>$(id).addEventListener('input',()=>{pickTransform();readings();drawCheck()}));
+['wn','wl','wv','lintype'].forEach(id=>$(id).addEventListener('input',()=>{if(S)drawTune()}));
+const setW=(a,b,c)=>{$('wn').value=a;$('wl').value=b;$('wv').value=c;if(S)drawTune()};
+$('pbc').onclick=()=>setW(1,1,1);$('pvar').onclick=()=>setW(0,0,1);$('plin').onclick=()=>setW(0,1,0);$('pnorm').onclick=()=>setW(1,0,0);
 let rt=null,lastW=0;
 new ResizeObserver(()=>{const w=document.querySelector('.wrap').clientWidth;if(w===lastW)return;lastW=w;clearTimeout(rt);rt=setTimeout(()=>{if(S)render()},80)}).observe(document.querySelector('.wrap'));
 fullRun();
