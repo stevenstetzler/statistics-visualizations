@@ -271,6 +271,11 @@ td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
         </select></label>
       <label for="lam" id="lamlab" hidden>λ<input id="lam" type="number" step="0.1" value="0.3" style="width:80px"></label>
     </div>
+    <div class="cols three" style="margin-bottom:14px">
+      <div class="panel"><p class="cap">Before: y against x (the plot from step 1).</p><div class="chart" id="c6s0"></div></div>
+      <div class="panel"><p class="cap" id="cap6s">After: transformed y against x.</p><div class="chart" id="c6s1"></div></div>
+    </div>
+    <p class="note" id="note6" style="font-size:14px;color:var(--ink);margin:0 0 14px;max-width:78ch"></p>
     <div class="cols three">
       <div class="panel"><p class="cap">Before: leftovers on the original scale.</p><div class="chart" id="c6a"></div></div>
       <div class="panel"><p class="cap" id="cap6b">After: leftovers on the transformed scale.</p><div class="chart" id="c6b"></div></div>
@@ -552,11 +557,12 @@ const dots=(xs,ys,X,Y,r,st)=>xs.map((q,i)=>'<circle cx="'+X(q)+'" cy="'+Y(ys[i])
 const DOT='fill:var(--c-data);fill-opacity:.55';
 
 /* step 1 */
-function drawScatter(){
-  const x=D.x,y=D.y,xm=Math.min(...x),xM=Math.max(...x),ym=Math.min(...y),yM=Math.max(...y);
+function drawScatter(el,x,y,fitted,ylab,aria){
+  el=el||$('c1');x=x||D.x;y=y||D.y;fitted=fitted||S.f0.fitted;ylab=ylab||'y';
+  const xm=Math.min(...x),xM=Math.max(...x),ym=Math.min(...y),yM=Math.max(...y);
   const y0=ym>=0?0:ym-0.05*(yM-ym),y1=yM+0.05*(yM-y0);
-  chart($('c1'),320,{x:[xm-0.03*(xM-xm),xM+0.03*(xM-xm),false],y:[y0,y1,false],xl:'x',yl:'y',label:'Scatter plot of y against x with fitted average',
-    marks:(X,Y)=>dots(x,y,X,Y,3,DOT)+'<path d="'+x.map((q,i)=>(i?'L':'M')+X(q)+' '+Y(S.f0.fitted[i])).join('')+'" fill="none" style="stroke:var(--ink);stroke-width:2.2"/>'});
+  chart(el,320,{x:[xm-0.03*(xM-xm),xM+0.03*(xM-xm),false],y:[y0,y1,false],xl:'x',yl:ylab,label:aria||'Scatter plot of y against x with fitted average',
+    marks:(X,Y)=>dots(x,y,X,Y,3,DOT)+'<path d="'+x.map((q,i)=>(i?'L':'M')+X(q)+' '+Y(fitted[i])).join('')+'" fill="none" style="stroke:var(--ink);stroke-width:2.2"/>'});
 }
 /* residual plot (steps 2, 3, 6) */
 function drawResid(el,fitted,res,bins,xl,showBins){
@@ -630,7 +636,18 @@ function drawBC(){
     after:(X,Y,f)=>[[1,'1'],[0.5,'½'],[0,'0'],[-1,'−1']].map(([q,l])=>'<text x="'+X(q)+'" y="'+(f.mg.t-7)+'" text-anchor="middle" class="strong">'+l+'</text>').join('')});
 }
 /* step 6 */
+function curveT(z){const o2=makeOLS(D.x,2),r=o2.fit(z);return r.beta[2]/Math.sqrt(r.sigma2*o2.inv[2][2])}
 function drawCheck(){
+  drawScatter($('c6s0'),D.x,D.y,S.f0.fitted,'y','Original y against x');
+  drawScatter($('c6s1'),D.x,S.after.z,S.after.f1.fitted,'transformed y','Transformed y against x');
+  $('cap6s').textContent='After: y transformed by '+S.T.label+', against x.';
+  let msg;
+  if(S.deg!==1)msg='<b>Is it a straight line?</b> You chose a curve for the average, so a bend is allowed here.';
+  else{const t0=curveT(S.f0.res.map((e,i)=>D.y[i])),t1=curveT(S.after.z);
+    msg='<b>Is it a straight line now?</b> It only has to be if the average is linear <em>on the transformed scale</em>, which is what Box–Cox assumes. A transformation that fixes the spread can bend the average. '
+      +'Bend check (z-score of a curve term; beyond about ±3 is a clear bend): before <b>'+num(t0,1)+'</b>, after <b>'+num(t1,1)+'</b>. '
+      +(Math.abs(t1)>3?'<span class="pill warn">Bent</span> The dots curve around the line. Try “Curve” in step 0, or keep y and use weights or a GLM (step 7).':'<span class="pill ok">Close to straight</span>');}
+  $('note6').innerHTML=msg;
   drawResid($('c6a'),S.f0.fitted,S.f0.res,S.bins,'fitted value (original scale)',true);
   drawResid($('c6b'),S.after.f1.fitted,S.after.f1.res,S.after.bins,'fitted value (transformed scale)',true);
   $('cap6b').textContent='After: leftovers on the transformed scale ('+S.T.label+').';
